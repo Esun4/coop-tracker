@@ -1,0 +1,162 @@
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+// ─── Auth (NextAuth) ────────────────────────────────────────
+
+model User {
+  id             String    @id @default(cuid())
+  name           String?
+  email          String    @unique
+  emailVerified  DateTime?
+  hashedPassword String?
+
+  googleAccessToken  String?
+  googleRefreshToken String?
+  lastEmailSync      DateTime?
+
+  accounts        Account[]
+  sessions        Session[]
+  applications    Application[]
+  emailSuggestions EmailSuggestion[]
+  activityLogs    ActivityLog[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Account {
+  id                String  @id @default(cuid())
+  userId            String
+  type              String
+  provider          String
+  providerAccountId String
+  refresh_token     String?
+  access_token      String?
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String?
+  session_state     String?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([provider, providerAccountId])
+}
+
+model Session {
+  id           String   @id @default(cuid())
+  sessionToken String   @unique
+  userId       String
+  expires      DateTime
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model VerificationToken {
+  identifier String
+  token      String
+  expires    DateTime
+
+  @@unique([identifier, token])
+}
+
+// ─── Application Tracker ────────────────────────────────────
+
+enum ApplicationStatus {
+  APPLYING
+  APPLIED
+  OA
+  INTERVIEW
+  FINAL_ROUND
+  OFFER
+  REJECTED
+  WITHDRAWN
+}
+
+model Application {
+  id              String            @id @default(cuid())
+  userId          String
+  company         String
+  roleTitle       String
+  location        String?
+  applicationDate DateTime?
+  status          ApplicationStatus @default(APPLYING)
+  source          String?
+  notes           String?
+  contactInfo     String?
+  archived        Boolean           @default(false)
+
+  user         User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  activityLogs ActivityLog[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([userId])
+  @@index([userId, status])
+  @@index([userId, archived])
+}
+
+// ─── Email Integration ──────────────────────────────────────
+
+enum SuggestedAction {
+  NEW_APPLICATION
+  STATUS_UPDATE
+}
+
+model EmailSuggestion {
+  id              String          @id @default(cuid())
+  userId          String
+  emailMessageId  String          @unique
+  emailSubject    String
+  emailSender     String
+  emailDate       DateTime
+  emailSnippet    String?
+  suggestedAction SuggestedAction
+  suggestedStatus ApplicationStatus?
+  suggestedCompany String?
+  suggestedRole    String?
+  confidence      Float
+  reasoning       String?
+  applicationId   String?
+  resolved        Boolean         @default(false)
+  resolvedAction  String?
+  resolvedAt      DateTime?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+
+  @@index([userId, resolved])
+}
+
+// ─── Activity Log ───────────────────────────────────────────
+
+model ActivityLog {
+  id            String  @id @default(cuid())
+  userId        String
+  applicationId String?
+  action        String
+  details       Json?
+  source        String  @default("manual")
+
+  user        User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  application Application? @relation(fields: [applicationId], references: [id], onDelete: SetNull)
+
+  createdAt DateTime @default(now())
+
+  @@index([userId])
+  @@index([applicationId])
+}
