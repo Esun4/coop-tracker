@@ -9,7 +9,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
-import { Search, X, Plus } from "lucide-react";
+import { Search, X, Plus, Mail, RefreshCw } from "lucide-react";
 import { applicationStatuses, statusLabels } from "@/lib/schemas";
 
 interface FiltersToolbarProps {
@@ -23,6 +23,9 @@ interface FiltersToolbarProps {
   showArchived: boolean;
   onShowArchivedChange: (value: boolean) => void;
   onAddNew: () => void;
+  onSyncGmail: () => void;
+  isSyncing: boolean;
+  pendingSuggestions: number;
 }
 
 export function FiltersToolbar({
@@ -36,6 +39,9 @@ export function FiltersToolbar({
   showArchived,
   onShowArchivedChange,
   onAddNew,
+  onSyncGmail,
+  isSyncing,
+  pendingSuggestions,
 }: FiltersToolbarProps) {
   const hasFilters = search || statusFilter || sourceFilter || showArchived;
 
@@ -103,7 +109,27 @@ export function FiltersToolbar({
           </Button>
         )}
 
-        <Button size="sm" className="h-9 ml-auto" onClick={onAddNew}>
+        <Button
+          variant="outline"
+          size="sm"
+          className="h-9 relative"
+          onClick={onSyncGmail}
+          disabled={isSyncing}
+        >
+          {isSyncing ? (
+            <RefreshCw className="mr-1 h-4 w-4 animate-spin" />
+          ) : (
+            <Mail className="mr-1 h-4 w-4" />
+          )}
+          {isSyncing ? "Syncing..." : "Sync Gmail"}
+          {pendingSuggestions > 0 && !isSyncing && (
+            <span className="ml-1.5 rounded-full bg-primary px-1.5 py-0.5 text-xs text-primary-foreground leading-none">
+              {pendingSuggestions}
+            </span>
+          )}
+        </Button>
+
+        <Button size="sm" className="h-9" onClick={onAddNew}>
           <Plus className="mr-1 h-4 w-4" />
           Add Application
         </Button>
