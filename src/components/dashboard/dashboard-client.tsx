@@ -6,6 +6,7 @@ import { ApplicationTable } from "./application-table";
 import { ApplicationForm } from "./application-form";
 import { FiltersToolbar } from "./filters-toolbar";
 import { ActivityFeed } from "./activity-feed";
+import { FunnelChart } from "./funnel-chart";
 import { EmailSuggestionsSection } from "./email-suggestions-section";
 import { ImportCsvDialog } from "./import-csv-dialog";
 import {
@@ -44,6 +45,7 @@ export function DashboardClient({ initial }: { initial: DashboardData }) {
   const [isPending, startTransition] = useTransition();
   const [isSyncing, setIsSyncing] = useState(false);
   const [showImport, setShowImport] = useState(false);
+  const [showAnalytics, setShowAnalytics] = useState(false);
 
   const refresh = useCallback(() => {
     startTransition(async () => {
@@ -164,47 +166,53 @@ export function DashboardClient({ initial }: { initial: DashboardData }) {
 
       <div className="grid gap-6 lg:grid-cols-[1fr_300px]">
         <div className="space-y-4">
-          <FiltersToolbar
-            search={search}
-            onSearchChange={setSearch}
-            statusFilter={statusFilter}
-            onStatusFilterChange={setStatusFilter}
-            sourceFilter={sourceFilter}
-            onSourceFilterChange={setSourceFilter}
-            sources={data.sources}
-            showArchived={showArchived}
-            onShowArchivedChange={setShowArchived}
-            onAddNew={() => setShowAddForm(true)}
-            onSyncGmail={handleSyncGmail}
-            isSyncing={isSyncing}
-            pendingSuggestions={data.suggestions.length}
-            onExport={handleExport}
-            onImport={() => setShowImport(true)}
-          />
+          {showAnalytics ? (
+            <div className="rounded-lg border bg-card p-6">
+              <FunnelChart applications={data.applications} />
+            </div>
+          ) : (
+            <>
+              <FiltersToolbar
+                search={search}
+                onSearchChange={setSearch}
+                statusFilter={statusFilter}
+                onStatusFilterChange={setStatusFilter}
+                sourceFilter={sourceFilter}
+                onSourceFilterChange={setSourceFilter}
+                sources={data.sources}
+                showArchived={showArchived}
+                onShowArchivedChange={setShowArchived}
+                onAddNew={() => setShowAddForm(true)}
+                onSyncGmail={handleSyncGmail}
+                isSyncing={isSyncing}
+                pendingSuggestions={data.suggestions.length}
+                onExport={handleExport}
+                onImport={() => setShowImport(true)}
+              />
 
-          <div className={isPending ? "opacity-60 pointer-events-none" : ""}>
-            <ApplicationTable
-              applications={[
-                ...data.applications.filter((a) => a.status !== "REJECTED"),
-                ...data.applications.filter((a) => a.status === "REJECTED"),
-              ]}
-              sortBy={sortBy}
-              sortOrder={sortOrder}
-              onSort={handleSort}
-              onUpdate={refresh}
-            />
-          </div>
+              <div className={isPending ? "opacity-60 pointer-events-none" : ""}>
+                <ApplicationTable
+                  applications={[
+                    ...data.applications.filter((a) => a.status !== "REJECTED"),
+                    ...data.applications.filter((a) => a.status === "REJECTED"),
+                  ]}
+                  sortBy={sortBy}
+                  sortOrder={sortOrder}
+                  onSort={handleSort}
+                  onUpdate={refresh}
+                />
+              </div>
+            </>
+          )}
         </div>
 
         <div className="space-y-4">
-          <a
-            href="/dashboard/analytics"
-            target="_blank"
-            rel="noopener noreferrer"
-            className="block w-full rounded-md border px-3 py-2 text-center text-sm font-medium hover:bg-muted/50 transition-colors"
+          <button
+            className="w-full rounded-md border px-3 py-2 text-center text-sm font-medium hover:bg-muted/50 transition-colors"
+            onClick={() => setShowAnalytics((v) => !v)}
           >
-            View Analytics
-          </a>
+            {showAnalytics ? "View Applications" : "View Analytics"}
+          </button>
           <ActivityFeed activities={data.activities} />
         </div>
       </div>
