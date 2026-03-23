@@ -155,7 +155,9 @@ export async function syncGmailEmails() {
 
 NEW_APPLICATION: email confirms an application was submitted.
 STATUS_UPDATE: email signals a change (interview invite, rejection, offer, OA, etc.).
-IRRELEVANT: unrelated to job applications.`,
+IRRELEVANT: unrelated to job applications, OR is an account/profile setup email (e.g. "set up your candidate account", "complete your profile", "verify your email", "activate your account", "create your account", "welcome to", onboarding emails from job platforms, login/password emails). Classify as IRRELEVANT even if the email mentions a company or job title.
+
+For the company field: extract the employer/hiring company, NOT the job board or platform the email was sent through. Indeed, LinkedIn, Glassdoor, Handshake, WaterlooWorks, ZipRecruiter, Monster, and similar are job boards — never use them as the company value. Look inside the email body for the actual employer name (e.g. "You applied to Software Engineer at Stripe" → company: "Stripe"). If you cannot identify the actual employer, set company to null.`,
           },
           { role: "user", content: emailText },
         ],

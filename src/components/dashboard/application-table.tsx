@@ -9,7 +9,6 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
@@ -25,8 +24,8 @@ import {
   ArrowUpDown,
   ArchiveRestore,
 } from "lucide-react";
-import { statusLabels, statusColors, type ApplicationStatusType } from "@/lib/schemas";
-import { archiveApplication, deleteApplication } from "@/lib/actions/applications";
+import { statusLabels, statusColors, applicationStatuses, type ApplicationStatusType } from "@/lib/schemas";
+import { archiveApplication, deleteApplication, updateApplicationStatus } from "@/lib/actions/applications";
 import { ApplicationForm } from "./application-form";
 import { toast } from "sonner";
 import type { Application } from "@/generated/prisma/client";
@@ -37,6 +36,61 @@ interface ApplicationTableProps {
   sortOrder: "asc" | "desc";
   onSort: (column: string) => void;
   onUpdate?: () => void;
+}
+
+function InlineStatusSelect({
+  application,
+  onUpdate,
+}: {
+  application: Application;
+  onUpdate?: () => void;
+}) {
+  const [loading, setLoading] = useState(false);
+
+  async function handleStatusChange(newStatus: string) {
+    if (newStatus === application.status) return;
+    setLoading(true);
+    const result = await updateApplicationStatus(application.id, newStatus);
+    setLoading(false);
+    if (result.error) {
+      toast.error(result.error);
+      return;
+    }
+    onUpdate?.();
+  }
+
+  return (
+    <DropdownMenu>
+      <DropdownMenuTrigger
+        render={
+          <button
+            className={`inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-xs font-medium transition-opacity hover:opacity-75 ${
+              statusColors[application.status as ApplicationStatusType] ?? ""
+            }`}
+            disabled={loading}
+          >
+            {loading ? "…" : statusLabels[application.status as ApplicationStatusType]}
+          </button>
+        }
+      />
+      <DropdownMenuContent>
+        {applicationStatuses.map((status) => (
+          <DropdownMenuItem
+            key={status}
+            onClick={() => handleStatusChange(status)}
+            className={application.status === status ? "font-semibold" : ""}
+          >
+            <span
+              className={`mr-2 inline-block h-2 w-2 rounded-full ${
+                statusColors[status]?.split(" ")[0] ?? ""
+              }`}
+            />
+            {statusLabels[status]}
+          </DropdownMenuItem>
+        ))}
+      </DropdownMenuContent>
+    </DropdownMenu>
+  );
 }
 
 export function ApplicationTable({
@@ -125,14 +179,7 @@ export function ApplicationTable({
                 <TableCell className="font-medium">{app.company}</TableCell>
                 <TableCell>{app.roleTitle}</TableCell>
                 <TableCell>
-                  <Badge
-                    variant="secondary"
-                    className={
-                      statusColors[app.status as ApplicationStatusType]
-                    }
-                  >
-                    {statusLabels[app.status as ApplicationStatusType]}
-                  </Badge>
+                  <InlineStatusSelect application={app} onUpdate={onUpdate} />
                 </TableCell>
                 <TableCell className="text-muted-foreground">
                   {app.applicationDate

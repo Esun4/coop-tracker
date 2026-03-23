@@ -173,6 +173,33 @@ export async function updateApplication(id: string, data: unknown) {
   return { success: true, application };
 }
 
+export async function updateApplicationStatus(id: string, status: string) {
+  const userId = await getAuthUserId();
+
+  const existing = await prisma.application.findFirst({
+    where: { id, userId },
+  });
+  if (!existing) return { error: "Application not found" };
+
+  await prisma.application.update({
+    where: { id },
+    data: { status: status as ApplicationStatus },
+  });
+
+  await prisma.activityLog.create({
+    data: {
+      userId,
+      applicationId: id,
+      action: "updated",
+      details: { status: { from: existing.status, to: status } },
+      source: "manual",
+    },
+  });
+
+  revalidatePath("/dashboard");
+  return { success: true };
+}
+
 export async function archiveApplication(id: string) {
   const userId = await getAuthUserId();
 
