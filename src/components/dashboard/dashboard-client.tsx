@@ -197,6 +197,14 @@ export function DashboardClient({ initial }: { initial: DashboardData }) {
         </div>
 
         <div className="space-y-4">
+          <a
+            href="/dashboard/analytics"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="block w-full rounded-md border px-3 py-2 text-center text-sm font-medium hover:bg-muted/50 transition-colors"
+          >
+            View Analytics
+          </a>
           <ActivityFeed activities={data.activities} />
         </div>
       </div>

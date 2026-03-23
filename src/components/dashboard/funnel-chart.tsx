@@ -78,7 +78,7 @@ export function FunnelChart({ applications }: { applications: Application[] }) {
   })).filter((f) => f.count > 0);
 
   // Total available height minus gaps
-  const totalH = Math.max(200, flows.length * 44);
+  const totalH = flows.length === 1 ? 40 : Math.max(200, flows.length * 44);
   const usableH = totalH - GAP * (flows.length - 1);
 
   // Compute per-flow heights proportional to count
