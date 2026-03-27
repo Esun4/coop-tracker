@@ -1,17 +1,15 @@
 import NextAuth from "next-auth";
 import Google from "next-auth/providers/google";
 import Credentials from "next-auth/providers/credentials";
+import { authConfig } from "@/lib/auth.config";
 import { CustomPrismaAdapter } from "@/lib/auth-adapter";
 import { prisma } from "@/lib/prisma";
 import bcrypt from "bcryptjs";
 import { encrypt } from "@/lib/crypto";
 
 export const { handlers, auth, signIn, signOut } = NextAuth({
+  ...authConfig,
   adapter: CustomPrismaAdapter(),
-  session: { strategy: "jwt" },
-  pages: {
-    signIn: "/auth/signin",
-  },
   providers: [
     Google({
       clientId: process.env.GOOGLE_CLIENT_ID!,
