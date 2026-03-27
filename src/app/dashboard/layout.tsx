@@ -13,7 +13,7 @@ export default async function DashboardLayout({
   return (
     <div className="min-h-screen flex flex-col">
       <DashboardNav user={session.user} />
-      <main className="flex-1 mx-auto px-16 lg:px-24 py-6 w-full">
+      <main className="flex-1 mx-auto px-8 lg:px-16 py-7 w-full max-w-[1400px]">
         {children}
       </main>
     </div>

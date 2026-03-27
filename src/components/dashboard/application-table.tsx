@@ -2,15 +2,6 @@
 
 import { useState } from "react";
 import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
-import { Button } from "@/components/ui/button";
-import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
@@ -23,9 +14,19 @@ import {
   Trash2,
   ArrowUpDown,
   ArchiveRestore,
+  ChevronUp,
+  ChevronDown,
 } from "lucide-react";
-import { statusLabels, statusColors, applicationStatuses, type ApplicationStatusType } from "@/lib/schemas";
-import { archiveApplication, deleteApplication, updateApplicationStatus } from "@/lib/actions/applications";
+import {
+  statusLabels,
+  applicationStatuses,
+  type ApplicationStatusType,
+} from "@/lib/schemas";
+import {
+  archiveApplication,
+  deleteApplication,
+  updateApplicationStatus,
+} from "@/lib/actions/applications";
 import { ApplicationForm } from "./application-form";
 import { toast } from "sonner";
 import type { Application } from "@/generated/prisma/client";
@@ -59,33 +60,29 @@ function InlineStatusSelect({
     onUpdate?.();
   }
 
+  const status = application.status as ApplicationStatusType;
+
   return (
     <DropdownMenu>
       <DropdownMenuTrigger
         render={
           <button
-            className={`inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-xs font-medium transition-opacity hover:opacity-75 ${
-              statusColors[application.status as ApplicationStatusType] ?? ""
-            }`}
+            className={`inline-flex items-center rounded-md px-2 py-0.5 text-xs font-medium transition-opacity hover:opacity-80 status-${status}`}
             disabled={loading}
           >
-            {loading ? "…" : statusLabels[application.status as ApplicationStatusType]}
+            {loading ? "…" : statusLabels[status]}
           </button>
         }
       />
       <DropdownMenuContent>
-        {applicationStatuses.map((status) => (
+        {applicationStatuses.map((s) => (
           <DropdownMenuItem
-            key={status}
-            onClick={() => handleStatusChange(status)}
-            className={application.status === status ? "font-semibold" : ""}
+            key={s}
+            onClick={() => handleStatusChange(s)}
+            className={application.status === s ? "font-semibold" : ""}
           >
-            <span
-              className={`mr-2 inline-block h-2 w-2 rounded-full ${
-                statusColors[status]?.split(" ")[0] ?? ""
-              }`}
-            />
-            {statusLabels[status]}
+            <span className={`mr-2 inline-block h-2 w-2 rounded-full status-${s}`} />
+            {statusLabels[s]}
           </DropdownMenuItem>
         ))}
       </DropdownMenuContent>
@@ -108,6 +105,7 @@ export function ApplicationTable({
       toast.error(result.error);
     } else {
       toast.success("Application updated");
+      onUpdate?.();
     }
   }
 
@@ -118,121 +116,147 @@ export function ApplicationTable({
       toast.error(result.error);
     } else {
       toast.success("Application deleted");
+      onUpdate?.();
     }
   }
 
   function SortHeader({ column, children }: { column: string; children: React.ReactNode }) {
+    const active = sortBy === column;
     return (
-      <Button
-        variant="ghost"
-        size="sm"
-        className="-ml-3 h-8"
+      <button
+        className="flex items-center gap-1 text-xs font-medium uppercase tracking-wider transition-colors"
+        style={{
+          color: active ? "oklch(0.145 0 0)" : "oklch(0.556 0 0)",
+          letterSpacing: "0.08em",
+        }}
         onClick={() => onSort(column)}
       >
         {children}
-        <ArrowUpDown className="ml-1 h-3 w-3" />
-        {sortBy === column && (
-          <span className="ml-1 text-xs">{sortOrder === "asc" ? "↑" : "↓"}</span>
+        {active ? (
+          sortOrder === "asc" ? (
+            <ChevronUp className="h-3 w-3" />
+          ) : (
+            <ChevronDown className="h-3 w-3" />
+          )
+        ) : (
+          <ArrowUpDown className="h-3 w-3 opacity-30" />
         )}
-      </Button>
+      </button>
     );
   }
 
   if (applications.length === 0) {
     return (
-      <div className="text-center py-12 text-muted-foreground">
-        <p className="text-lg">No applications yet</p>
-        <p className="text-sm mt-1">Add your first application to get started.</p>
+      <div className="rounded-lg border bg-card py-16 text-center">
+        <p className="font-heading text-lg mb-1 text-muted-foreground">
+          No applications yet
+        </p>
+        <p className="text-sm text-muted-foreground/70">
+          Add your first application to get started
+        </p>
       </div>
     );
   }
 
   return (
     <>
-      <div className="rounded-md border">
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead>
-                <SortHeader column="company">Company</SortHeader>
-              </TableHead>
-              <TableHead>
-                <SortHeader column="roleTitle">Role</SortHeader>
-              </TableHead>
-              <TableHead>
-                <SortHeader column="status">Status</SortHeader>
-              </TableHead>
-              <TableHead>
-                <SortHeader column="applicationDate">Date</SortHeader>
-              </TableHead>
-              <TableHead>Location</TableHead>
-              <TableHead>Source</TableHead>
-              <TableHead className="w-[50px]" />
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {applications.map((app) => (
-              <TableRow
-                key={app.id}
-                className={app.archived ? "opacity-50" : undefined}
-              >
-                <TableCell className="font-medium">{app.company}</TableCell>
-                <TableCell>{app.roleTitle}</TableCell>
-                <TableCell>
-                  <InlineStatusSelect application={app} onUpdate={onUpdate} />
-                </TableCell>
-                <TableCell className="text-muted-foreground">
-                  {app.applicationDate
-                    ? new Date(app.applicationDate).toLocaleDateString()
-                    : "—"}
-                </TableCell>
-                <TableCell className="text-muted-foreground">
-                  {app.location || "—"}
-                </TableCell>
-                <TableCell className="text-muted-foreground">
-                  {app.source || "—"}
-                </TableCell>
-                <TableCell>
-                  <DropdownMenu>
-                    <DropdownMenuTrigger
-                      render={
-                        <Button variant="ghost" size="icon" className="h-8 w-8">
-                          <MoreHorizontal className="h-4 w-4" />
-                        </Button>
-                      }
-                    />
-                    <DropdownMenuContent align="end">
-                      <DropdownMenuItem onClick={() => setEditApp(app)}>
-                        <Pencil className="mr-2 h-4 w-4" />
-                        Edit
-                      </DropdownMenuItem>
-                      <DropdownMenuItem onClick={() => handleArchive(app.id)}>
-                        {app.archived ? (
-                          <>
-                            <ArchiveRestore className="mr-2 h-4 w-4" />
-                            Unarchive
-                          </>
-                        ) : (
-                          <>
-                            <Archive className="mr-2 h-4 w-4" />
-                            Archive
-                          </>
-                        )}
-                      </DropdownMenuItem>
-                      <DropdownMenuItem
-                        className="text-destructive"
-                        onClick={() => handleDelete(app.id)}
-                      >
-                        <Trash2 className="mr-2 h-4 w-4" />
-                        Delete
-                      </DropdownMenuItem>
-                    </DropdownMenuContent>
-                  </DropdownMenu>
-                </TableCell>
-              </TableRow>
-            ))}
-          </TableBody>
-        </Table>
+      <div className="rounded-lg border bg-card overflow-hidden">
+        {/* Header */}
+        <div
+          className="grid px-4 py-2.5 bg-muted/50"
+          style={{
+            gridTemplateColumns: "1fr 1fr 130px 100px 110px 90px 40px",
+            borderBottom: "1px solid oklch(0.922 0 0)",
+          }}
+        >
+          <SortHeader column="company">Company</SortHeader>
+          <SortHeader column="roleTitle">Role</SortHeader>
+          <SortHeader column="status">Status</SortHeader>
+          <SortHeader column="applicationDate">Date</SortHeader>
+          <span className="text-xs font-medium uppercase tracking-wider text-muted-foreground" style={{ letterSpacing: "0.08em" }}>
+            Location
+          </span>
+          <span className="text-xs font-medium uppercase tracking-wider text-muted-foreground" style={{ letterSpacing: "0.08em" }}>
+            Source
+          </span>
+          <span />
+        </div>
+
+        {/* Rows */}
+        <div>
+          {applications.map((app) => (
+            <div
+              key={app.id}
+              className="ledger-row grid px-4 py-3"
+              style={{
+                gridTemplateColumns: "1fr 1fr 130px 100px 110px 90px 40px",
+                borderBottom: "1px solid oklch(0.95 0 0)",
+                opacity: app.archived ? 0.45 : 1,
+                alignItems: "center",
+              }}
+            >
+              <span className="text-sm font-medium truncate pr-2 text-foreground">
+                {app.company}
+              </span>
+              <span className="text-sm truncate pr-2 text-muted-foreground">
+                {app.roleTitle}
+              </span>
+              <span>
+                <InlineStatusSelect application={app} onUpdate={onUpdate} />
+              </span>
+              <span className="font-mono text-xs text-muted-foreground">
+                {app.applicationDate
+                  ? new Date(app.applicationDate).toLocaleDateString("en-US", {
+                      month: "short",
+                      day: "numeric",
+                    })
+                  : "—"}
+              </span>
+              <span className="text-xs truncate pr-2 text-muted-foreground">
+                {app.location || "—"}
+              </span>
+              <span className="text-xs truncate text-muted-foreground">
+                {app.source || "—"}
+              </span>
+
+              <DropdownMenu>
+                <DropdownMenuTrigger
+                  render={
+                    <button className="flex h-7 w-7 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-muted hover:text-foreground">
+                      <MoreHorizontal className="h-4 w-4" />
+                    </button>
+                  }
+                />
+                <DropdownMenuContent align="end">
+                  <DropdownMenuItem onClick={() => setEditApp(app)}>
+                    <Pencil className="mr-2 h-3.5 w-3.5" />
+                    Edit
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => handleArchive(app.id)}>
+                    {app.archived ? (
+                      <>
+                        <ArchiveRestore className="mr-2 h-3.5 w-3.5" />
+                        Unarchive
+                      </>
+                    ) : (
+                      <>
+                        <Archive className="mr-2 h-3.5 w-3.5" />
+                        Archive
+                      </>
+                    )}
+                  </DropdownMenuItem>
+                  <DropdownMenuItem
+                    className="text-destructive"
+                    onClick={() => handleDelete(app.id)}
+                  >
+                    <Trash2 className="mr-2 h-3.5 w-3.5" />
+                    Delete
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+            </div>
+          ))}
+        </div>
       </div>
 
       <ApplicationForm

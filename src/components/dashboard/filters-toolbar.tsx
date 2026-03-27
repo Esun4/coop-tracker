@@ -57,20 +57,22 @@ export function FiltersToolbar({
   }
 
   return (
-    <div className="flex flex-col sm:flex-row gap-3">
+    <div className="flex flex-col sm:flex-row gap-2.5">
+      {/* Search */}
       <div className="relative flex-1">
-        <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+        <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
         <Input
-          placeholder="Search company, role, location..."
+          placeholder="Search company, role, location…"
           value={search}
           onChange={(e) => onSearchChange(e.target.value)}
-          className="pl-9"
+          className="pl-9 h-9 text-sm"
         />
       </div>
 
-      <div className="flex gap-2 flex-wrap">
+      {/* Controls */}
+      <div className="flex gap-2 flex-wrap items-center">
         <Select value={statusFilter} onValueChange={(v) => onStatusFilterChange(v ?? "")}>
-          <SelectTrigger className="w-[140px]">
+          <SelectTrigger className="h-9 w-[138px] text-sm">
             <SelectValue placeholder="All statuses" />
           </SelectTrigger>
           <SelectContent>
@@ -84,7 +86,7 @@ export function FiltersToolbar({
         </Select>
 
         <Select value={sourceFilter} onValueChange={(v) => onSourceFilterChange(v ?? "")}>
-          <SelectTrigger className="w-[140px]">
+          <SelectTrigger className="h-9 w-[130px] text-sm">
             <SelectValue placeholder="All sources" />
           </SelectTrigger>
           <SelectContent>
@@ -100,51 +102,53 @@ export function FiltersToolbar({
         <Button
           variant={showArchived ? "secondary" : "outline"}
           size="sm"
-          className="h-9"
+          className="h-9 text-xs"
           onClick={() => onShowArchivedChange(!showArchived)}
         >
-          {showArchived ? "Hide Archived" : "Show Archived"}
+          {showArchived ? "Hide Archived" : "Archived"}
         </Button>
 
         {hasFilters && (
-          <Button variant="ghost" size="sm" className="h-9" onClick={clearFilters}>
+          <Button variant="ghost" size="sm" className="h-9 text-xs" onClick={clearFilters}>
             <X className="mr-1 h-3 w-3" />
             Clear
           </Button>
         )}
 
+        <div className="h-5 w-px bg-border hidden sm:block" />
+
         <Button
           variant="outline"
           size="sm"
-          className="h-9 relative"
+          className="h-9 text-xs"
           onClick={onSyncGmail}
           disabled={isSyncing}
         >
           {isSyncing ? (
-            <RefreshCw className="mr-1 h-4 w-4 animate-spin" />
+            <RefreshCw className="mr-1.5 h-3.5 w-3.5 animate-spin" />
           ) : (
-            <Mail className="mr-1 h-4 w-4" />
+            <Mail className="mr-1.5 h-3.5 w-3.5" />
           )}
-          {isSyncing ? "Syncing..." : "Sync Gmail"}
+          {isSyncing ? "Syncing…" : "Gmail"}
           {pendingSuggestions > 0 && !isSyncing && (
-            <span className="ml-1.5 rounded-full bg-primary px-1.5 py-0.5 text-xs text-primary-foreground leading-none">
+            <span className="ml-1.5 flex h-4 w-4 items-center justify-center rounded-full bg-primary text-[10px] font-mono font-semibold text-primary-foreground">
               {pendingSuggestions}
             </span>
           )}
         </Button>
 
-        <Button variant="outline" size="sm" className="h-9" onClick={onImport}>
-          <Upload className="mr-1 h-4 w-4" />
-          Import CSV
+        <Button variant="outline" size="sm" className="h-9 text-xs" onClick={onImport}>
+          <Upload className="mr-1.5 h-3.5 w-3.5" />
+          Import
         </Button>
 
-        <Button variant="outline" size="sm" className="h-9" onClick={onExport}>
-          <Download className="mr-1 h-4 w-4" />
-          Export CSV
+        <Button variant="outline" size="sm" className="h-9 text-xs" onClick={onExport}>
+          <Download className="mr-1.5 h-3.5 w-3.5" />
+          Export
         </Button>
 
-        <Button size="sm" className="h-9" onClick={onAddNew}>
-          <Plus className="mr-1 h-4 w-4" />
+        <Button size="sm" className="h-9 text-xs" onClick={onAddNew}>
+          <Plus className="mr-1.5 h-3.5 w-3.5" />
           Add Application
         </Button>
       </div>

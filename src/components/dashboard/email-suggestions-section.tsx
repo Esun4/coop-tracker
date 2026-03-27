@@ -195,9 +195,10 @@ function SuggestionReviewModal({
         {/* Action badge + confidence */}
         <div className="flex items-center gap-2">
           <span
-            className={`rounded-full px-2.5 py-0.5 text-xs font-medium ${
+            className={`inline-flex items-center justify-center rounded-full px-2.5 py-1 text-xs font-medium whitespace-nowrap ${
               actionColors[current.suggestedAction] ?? ""
             }`}
+            style={{ minWidth: "110px" }}
           >
             {actionLabels[current.suggestedAction] ?? current.suggestedAction}
           </span>
@@ -776,9 +777,10 @@ export function EmailSuggestionsSection({
                   >
                     <td className="px-4 py-3">
                       <span
-                        className={`inline-flex rounded-full px-2 py-0.5 text-xs font-medium ${
+                        className={`inline-flex items-center justify-center rounded-full px-2.5 py-1 text-xs font-medium whitespace-nowrap ${
                           actionColors[s.suggestedAction] ?? ""
                         }`}
+                        style={{ minWidth: "110px" }}
                       >
                         {actionLabels[s.suggestedAction] ?? s.suggestedAction}
                       </span>

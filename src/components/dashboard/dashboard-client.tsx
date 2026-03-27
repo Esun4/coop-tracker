@@ -20,6 +20,7 @@ import { syncGmailEmails } from "@/lib/actions/gmail";
 import type { Application, EmailSuggestion } from "@/generated/prisma/client";
 import { statusLabels } from "@/lib/schemas";
 import { toast } from "sonner";
+import { BarChart2, List } from "lucide-react";
 
 interface DashboardData {
   applications: Application[];
@@ -91,15 +92,8 @@ export function DashboardClient({ initial }: { initial: DashboardData }) {
     }
 
     const headers = [
-      "Company",
-      "Role",
-      "Status",
-      "Location",
-      "Application Date",
-      "Source",
-      "Contact / Recruiter",
-      "Notes",
-      "Archived",
+      "Company", "Role", "Status", "Location",
+      "Application Date", "Source", "Contact / Recruiter", "Notes", "Archived",
     ];
 
     function escape(val: string | null | undefined): string {
@@ -153,7 +147,7 @@ export function DashboardClient({ initial }: { initial: DashboardData }) {
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-5">
       <StatsCards stats={data.stats} />
 
       {data.suggestions.length > 0 && (
@@ -164,8 +158,9 @@ export function DashboardClient({ initial }: { initial: DashboardData }) {
         />
       )}
 
-      <div className="grid gap-6 lg:grid-cols-[1fr_300px]">
-        <div className="space-y-4">
+      <div className="grid gap-5 lg:grid-cols-[1fr_280px]">
+        {/* Main column */}
+        <div className="space-y-3">
           {showAnalytics ? (
             <div className="rounded-lg border bg-card p-6">
               <FunnelChart applications={data.applications} />
@@ -190,7 +185,7 @@ export function DashboardClient({ initial }: { initial: DashboardData }) {
                 onImport={() => setShowImport(true)}
               />
 
-              <div className={isPending ? "opacity-60 pointer-events-none" : ""}>
+              <div className={isPending ? "opacity-50 pointer-events-none transition-opacity" : "transition-opacity"}>
                 <ApplicationTable
                   applications={[
                     ...data.applications.filter((a) => a.status !== "REJECTED"),
@@ -206,13 +201,35 @@ export function DashboardClient({ initial }: { initial: DashboardData }) {
           )}
         </div>
 
-        <div className="space-y-4">
-          <button
-            className="w-full rounded-md border px-3 py-2 text-center text-sm font-medium hover:bg-muted/50 transition-colors"
-            onClick={() => setShowAnalytics((v) => !v)}
-          >
-            {showAnalytics ? "View Applications" : "View Analytics"}
-          </button>
+        {/* Sidebar */}
+        <div className="space-y-3">
+          {/* View toggle */}
+          <div className="flex rounded-lg border bg-card overflow-hidden">
+            <button
+              className="flex flex-1 items-center justify-center gap-2 py-2.5 text-xs font-medium transition-colors"
+              style={{
+                background: !showAnalytics ? "oklch(0.97 0 0)" : "transparent",
+                color: !showAnalytics ? "oklch(0.145 0 0)" : "oklch(0.556 0 0)",
+                borderRight: "1px solid oklch(0.922 0 0)",
+              }}
+              onClick={() => setShowAnalytics(false)}
+            >
+              <List className="h-3.5 w-3.5" />
+              List
+            </button>
+            <button
+              className="flex flex-1 items-center justify-center gap-2 py-2.5 text-xs font-medium transition-colors"
+              style={{
+                background: showAnalytics ? "oklch(0.97 0 0)" : "transparent",
+                color: showAnalytics ? "oklch(0.145 0 0)" : "oklch(0.556 0 0)",
+              }}
+              onClick={() => setShowAnalytics(true)}
+            >
+              <BarChart2 className="h-3.5 w-3.5" />
+              Analytics
+            </button>
+          </div>
+
           <ActivityFeed activities={data.activities} />
         </div>
       </div>

@@ -1,15 +1,13 @@
 "use client";
 
 import { signOut } from "next-auth/react";
-import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { Avatar, AvatarFallback } from "@/components/ui/avatar";
-import { LogOut, User } from "lucide-react";
+import { LogOut, ChevronDown } from "lucide-react";
 
 interface DashboardNavProps {
   user: {
@@ -29,36 +27,44 @@ export function DashboardNav({ user }: DashboardNavProps) {
 
   return (
     <header className="border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
-      <div className="flex h-14 items-center justify-between px-8 lg:px-12">
-        <div className="flex items-center gap-2">
-          <h1 className="text-lg font-semibold">AppTracker</h1>
+      <div className="flex h-14 items-center justify-between px-8 lg:px-16">
+        {/* Wordmark */}
+        <div className="flex items-center">
+          <span className="font-heading text-xl font-semibold tracking-tight text-foreground">
+            App
+          </span>
+          <span className="font-heading text-xl font-semibold tracking-tight text-primary">
+            Tracker
+          </span>
         </div>
 
+        {/* User menu */}
         <DropdownMenu>
           <DropdownMenuTrigger
             render={
-              <Button variant="ghost" className="relative h-8 w-8 rounded-full">
-                <Avatar className="h-8 w-8">
-                  <AvatarFallback className="text-xs">{initials}</AvatarFallback>
-                </Avatar>
-              </Button>
+              <button className="flex items-center gap-2.5 rounded-md border px-2.5 py-1.5 text-sm text-muted-foreground transition-colors hover:bg-muted hover:text-foreground">
+                <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-muted text-xs font-medium text-foreground border">
+                  {initials}
+                </span>
+                <span className="hidden sm:block max-w-[160px] truncate">
+                  {user.name ?? user.email}
+                </span>
+                <ChevronDown className="h-3 w-3 opacity-50" />
+              </button>
             }
           />
           <DropdownMenuContent align="end">
-            <div className="flex items-center gap-2 p-2">
-              <div className="flex flex-col space-y-0.5">
-                {user.name && (
-                  <p className="text-sm font-medium">{user.name}</p>
-                )}
-                <p className="text-xs text-muted-foreground">{user.email}</p>
-              </div>
+            <div className="px-3 py-2.5 border-b">
+              {user.name && (
+                <p className="text-sm font-medium">{user.name}</p>
+              )}
+              <p className="text-xs text-muted-foreground">{user.email}</p>
             </div>
-            <DropdownMenuItem disabled>
-              <User className="mr-2 h-4 w-4" />
-              Profile
-            </DropdownMenuItem>
-            <DropdownMenuItem onClick={() => signOut({ callbackUrl: "/auth/signin" })}>
-              <LogOut className="mr-2 h-4 w-4" />
+            <DropdownMenuItem
+              onClick={() => signOut({ callbackUrl: "/auth/signin" })}
+              className="mx-1 my-1 cursor-pointer"
+            >
+              <LogOut className="mr-2 h-3.5 w-3.5" />
               Sign out
             </DropdownMenuItem>
           </DropdownMenuContent>
