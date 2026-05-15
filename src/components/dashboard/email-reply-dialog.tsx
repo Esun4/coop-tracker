@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { Loader2, Send } from "lucide-react";
+import { Loader2, Send, Pencil } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import {
@@ -27,7 +27,8 @@ export function EmailReplyDialog({
   onOpenChange,
   onSent,
 }: EmailReplyDialogProps) {
-  const [phase, setPhase] = useState<"loading" | "editing" | "sending">("loading");
+  const [phase, setPhase] = useState<"loading" | "preview" | "editing" | "sending">("loading");
+  const [draftText, setDraftText] = useState("");
   const [editedText, setEditedText] = useState("");
   const [draftError, setDraftError] = useState<string | null>(null);
 
@@ -36,8 +37,9 @@ export function EmailReplyDialog({
       if ("error" in result) {
         setDraftError(result.error ?? "Failed to generate draft");
       } else {
+        setDraftText(result.draft);
         setEditedText(result.draft);
-        setPhase("editing");
+        setPhase("preview");
       }
     });
   }, []);
@@ -47,7 +49,7 @@ export function EmailReplyDialog({
     const result = await sendEmailReply(suggestion.id, editedText);
     if ("error" in result && result.error) {
       toast.error(result.error);
-      setPhase("editing");
+      setPhase(draftText !== editedText ? "editing" : "preview");
       return;
     }
     toast.success("Reply sent");
@@ -55,9 +57,15 @@ export function EmailReplyDialog({
     onOpenChange(false);
   }
 
+  function handleEdit() {
+    setPhase("editing");
+  }
+
   function handleSkip() {
     onOpenChange(false);
   }
+
+  const isReady = phase === "preview" || phase === "editing" || phase === "sending";
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -95,41 +103,62 @@ export function EmailReplyDialog({
           </div>
         )}
 
-        {(phase === "editing" || phase === "sending") && !draftError && (
+        {isReady && !draftError && (
           <>
-            <Textarea
-              value={editedText}
-              onChange={(e) => setEditedText(e.target.value)}
-              rows={6}
-              disabled={phase === "sending"}
-              className="resize-none text-sm"
-            />
-            <div className="flex justify-end gap-2">
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={handleSkip}
+            {phase === "preview" ? (
+              <div className="rounded-md border bg-muted/30 px-3 py-2.5 text-sm whitespace-pre-wrap leading-relaxed text-foreground min-h-[9rem]">
+                {editedText}
+              </div>
+            ) : (
+              <Textarea
+                value={editedText}
+                onChange={(e) => setEditedText(e.target.value)}
+                rows={6}
                 disabled={phase === "sending"}
-              >
-                Skip
-              </Button>
+                className="resize-none text-sm"
+                autoFocus
+              />
+            )}
+
+            <div className="flex items-center justify-between">
               <Button
+                variant="ghost"
                 size="sm"
-                onClick={handleSend}
-                disabled={phase === "sending"}
+                onClick={handleEdit}
+                disabled={phase === "sending" || phase === "editing"}
+                className="text-muted-foreground"
               >
-                {phase === "sending" ? (
-                  <>
-                    <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />
-                    Sending…
-                  </>
-                ) : (
-                  <>
-                    <Send className="mr-1.5 h-3.5 w-3.5" />
-                    Send
-                  </>
-                )}
+                <Pencil className="mr-1.5 h-3.5 w-3.5" />
+                Edit
               </Button>
+
+              <div className="flex gap-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={handleSkip}
+                  disabled={phase === "sending"}
+                >
+                  Skip
+                </Button>
+                <Button
+                  size="sm"
+                  onClick={handleSend}
+                  disabled={phase === "sending"}
+                >
+                  {phase === "sending" ? (
+                    <>
+                      <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />
+                      Sending…
+                    </>
+                  ) : (
+                    <>
+                      <Send className="mr-1.5 h-3.5 w-3.5" />
+                      Send
+                    </>
+                  )}
+                </Button>
+              </div>
             </div>
           </>
         )}

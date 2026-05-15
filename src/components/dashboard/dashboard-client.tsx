@@ -230,7 +230,7 @@ export function DashboardClient({ initial }: { initial: DashboardData }) {
             </button>
           </div>
 
-          <ActivityFeed activities={data.activities} />
+          <ActivityFeed activities={data.activities} onResolved={refresh} />
         </div>
       </div>
 

@@ -255,6 +255,62 @@ export async function acceptStatusUpdate(
   return { success: true };
 }
 
+export async function undoEmailSuggestion(activityLogId: string) {
+  const userId = await getAuthUserId();
+
+  const log = await prisma.activityLog.findFirst({
+    where: { id: activityLogId, userId, source: ActivitySource.email_suggestion },
+  });
+  if (!log) return { error: "Activity not found" };
+
+  const details = log.details as Record<string, { from?: string; to?: string }> | null;
+
+  // Find the linked suggestion before modifying anything
+  let suggestionId: string | null = null;
+  if (log.applicationId) {
+    const suggestionWhere: Record<string, unknown> = {
+      applicationId: log.applicationId,
+      resolvedAction: "accepted",
+      userId,
+    };
+    if (log.action === "updated" && details?.status?.to) {
+      suggestionWhere.suggestedStatus = details.status.to;
+    }
+    const suggestion = await prisma.emailSuggestion.findFirst({ where: suggestionWhere });
+    suggestionId = suggestion?.id ?? null;
+  }
+
+  // Revert the application change
+  if (log.action === "created" && log.applicationId) {
+    await prisma.application.delete({ where: { id: log.applicationId } });
+    // ApplicationId on the log is set to null by SetNull cascade — record still exists
+  } else if (log.action === "updated" && log.applicationId && details?.status?.from) {
+    await prisma.application.update({
+      where: { id: log.applicationId },
+      data: { status: details.status.from as ApplicationStatus },
+    });
+  }
+
+  // Delete the activity log entry
+  await prisma.activityLog.delete({ where: { id: activityLogId } });
+
+  // Restore the suggestion to unresolved so it re-appears in the queue
+  if (suggestionId) {
+    await prisma.emailSuggestion.update({
+      where: { id: suggestionId },
+      data: {
+        resolved: false,
+        resolvedAction: null,
+        resolvedAt: null,
+        applicationId: null,
+      },
+    });
+  }
+
+  revalidatePath("/dashboard");
+  return { success: true };
+}
+
 export async function generateEmailDraft(suggestionId: string) {
   const userId = await getAuthUserId();
 

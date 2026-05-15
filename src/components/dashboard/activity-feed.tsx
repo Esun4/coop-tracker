@@ -1,5 +1,17 @@
+"use client";
+
+import { useState } from "react";
 import { statusLabels, type ApplicationStatusType } from "@/lib/schemas";
-import { Plus, ArrowRight, Archive, ArchiveRestore, Mail } from "lucide-react";
+import { Plus, ArrowRight, Archive, ArchiveRestore, Mail, MoreHorizontal, Undo2 } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import {
+  DropdownMenu,
+  DropdownMenuTrigger,
+  DropdownMenuContent,
+  DropdownMenuItem,
+} from "@/components/ui/dropdown-menu";
+import { toast } from "sonner";
+import { undoEmailSuggestion } from "@/lib/actions/suggestions";
 
 interface ActivityItem {
   id: string;
@@ -15,6 +27,7 @@ interface ActivityItem {
 
 interface ActivityFeedProps {
   activities: ActivityItem[];
+  onResolved: () => void;
 }
 
 function getActivityIcon(action: string, source: string) {
@@ -71,7 +84,53 @@ function getIconColor(action: string, source: string): string {
   return "#374151";
 }
 
-export function ActivityFeed({ activities }: ActivityFeedProps) {
+function ActivityItemMenu({
+  activityId,
+  onResolved,
+}: {
+  activityId: string;
+  onResolved: () => void;
+}) {
+  const [loading, setLoading] = useState(false);
+
+  async function handleUndo() {
+    setLoading(true);
+    const result = await undoEmailSuggestion(activityId);
+    setLoading(false);
+    if ("error" in result && result.error) {
+      toast.error(result.error);
+      return;
+    }
+    toast.success("Action undone — suggestion restored to queue");
+    onResolved();
+  }
+
+  return (
+    <DropdownMenu>
+      <DropdownMenuTrigger
+        render={
+          <Button
+            variant="ghost"
+            size="sm"
+            className="h-6 w-6 p-0 opacity-0 group-hover/activity-row:opacity-100 transition-opacity shrink-0"
+            disabled={loading}
+            aria-label="Options"
+          />
+        }
+      >
+        <MoreHorizontal className="h-3.5 w-3.5" />
+      </DropdownMenuTrigger>
+      <DropdownMenuContent side="left" align="start">
+        <DropdownMenuItem onClick={handleUndo} disabled={loading}>
+          <Undo2 className="h-3.5 w-3.5" />
+          Undo
+        </DropdownMenuItem>
+      </DropdownMenuContent>
+    </DropdownMenu>
+  );
+}
+
+export function ActivityFeed({ activities, onResolved }: ActivityFeedProps) {
   return (
     <div className="rounded-lg border bg-card overflow-hidden">
       {/* Header */}
@@ -96,11 +155,12 @@ export function ActivityFeed({ activities }: ActivityFeedProps) {
               const Icon = getActivityIcon(activity.action, activity.source);
               const iconColor = getIconColor(activity.action, activity.source);
               const desc = getActivityDescription(activity);
+              const isEmailSuggestion = activity.source === "email_suggestion";
 
               return (
                 <div
                   key={activity.id}
-                  className="flex items-start gap-3 py-2.5 animate-fade-up"
+                  className="group/activity-row flex items-start gap-3 py-2.5 animate-fade-up"
                   style={{ animationDelay: `${i * 40}ms` }}
                 >
                   {/* Icon dot */}
@@ -118,15 +178,23 @@ export function ActivityFeed({ activities }: ActivityFeedProps) {
                     {desc.secondary && (
                       <p className="text-xs truncate leading-tight mt-0.5 text-muted-foreground">
                         {desc.secondary}
-                        {activity.source === "email_suggestion" && " · email"}
+                        {isEmailSuggestion && " · email"}
                       </p>
                     )}
                   </div>
 
-                  {/* Timestamp */}
-                  <span className="font-mono text-xs shrink-0 pt-0.5 text-muted-foreground">
-                    {timeAgo(activity.createdAt)}
-                  </span>
+                  {/* Timestamp + 3-dot menu */}
+                  <div className="flex items-center gap-1 shrink-0 pt-0.5">
+                    <span className="font-mono text-xs text-muted-foreground">
+                      {timeAgo(activity.createdAt)}
+                    </span>
+                    {isEmailSuggestion && (
+                      <ActivityItemMenu
+                        activityId={activity.id}
+                        onResolved={onResolved}
+                      />
+                    )}
+                  </div>
                 </div>
               );
             })}
