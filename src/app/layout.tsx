@@ -1,28 +1,33 @@
 import type { Metadata } from "next";
-import { Playfair_Display, DM_Sans, JetBrains_Mono } from "next/font/google";
+import localFont from "next/font/local";
 import { Toaster } from "@/components/ui/sonner";
 import "./globals.css";
 
-const playfair = Playfair_Display({
+// Self-hosted variable fonts (latin subset) so dev/build never fetches from
+// Google at compile time. Source files live in src/fonts/.
+const playfair = localFont({
   variable: "--font-playfair",
-  subsets: ["latin"],
-  weight: ["400", "500", "600", "700"],
+  src: "../fonts/PlayfairDisplay-latin.woff2",
+  weight: "400 700",
+  display: "swap",
 });
 
-const dmSans = DM_Sans({
+const dmSans = localFont({
   variable: "--font-dm-sans",
-  subsets: ["latin"],
-  weight: ["300", "400", "500", "600"],
+  src: "../fonts/DMSans-latin.woff2",
+  weight: "300 600",
+  display: "swap",
 });
 
-const jetbrainsMono = JetBrains_Mono({
+const jetbrainsMono = localFont({
   variable: "--font-jetbrains-mono",
-  subsets: ["latin"],
-  weight: ["400", "500"],
+  src: "../fonts/JetBrainsMono-latin.woff2",
+  weight: "400 500",
+  display: "swap",
 });
 
 export const metadata: Metadata = {
-  title: "AppTracker — Job Application Tracker",
+  title: "cooptracker — Job Application Tracker",
   description: "Track your co-op and internship applications",
 };
 

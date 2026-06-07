@@ -1,8 +1,8 @@
 import type { Metadata } from "next";
 
 export const metadata: Metadata = {
-  title: "Privacy Policy — AppTracker",
-  description: "Privacy policy for AppTracker job application tracker",
+  title: "Privacy Policy — cooptracker",
+  description: "Privacy policy for cooptracker job application tracker",
 };
 
 export default function PrivacyPage() {
@@ -113,7 +113,7 @@ export default function PrivacyPage() {
             </li>
             <li data-custom-class="body_text" style={{ lineHeight: 1.5 }}>
               <span style={{ fontSize: 15 }}>
-                Use <strong>Jobtracker</strong>. AppTracker is a job application
+                Use <strong>cooptracker</strong>. cooptracker is a job application
                 tracker built for students managing co-op and internship searches.
                 It lets you log and track applications through every stage of the
                 hiring process — from initial apply through offers, rejections, and

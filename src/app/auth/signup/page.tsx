@@ -44,8 +44,8 @@ export default function SignUpPage() {
       {/* Left decorative panel */}
       <div className="hidden lg:flex lg:w-[420px] xl:w-[480px] flex-col justify-between p-12 bg-muted border-r">
         <div>
-          <span className="font-heading text-2xl font-semibold text-foreground">App</span>
-          <span className="font-heading text-2xl font-semibold text-primary">Tracker</span>
+          <span className="font-heading text-2xl font-semibold text-foreground">coop</span>
+          <span className="font-heading text-2xl font-semibold text-primary">tracker</span>
         </div>
 
         <div className="space-y-6">
@@ -79,7 +79,7 @@ export default function SignUpPage() {
         <div className="w-full max-w-[360px] space-y-7 animate-fade-up">
           {/* Mobile wordmark */}
           <div className="lg:hidden text-center">
-            <span className="font-heading text-2xl font-semibold text-foreground">App</span>
+            <span className="font-heading text-2xl font-semibold text-foreground">Coop</span>
             <span className="font-heading text-2xl font-semibold text-primary">Tracker</span>
           </div>
 
