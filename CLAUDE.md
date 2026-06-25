@@ -91,3 +91,34 @@ Check these when working in the relevant area:
 | File | When to read |
 |------|-------------|
 | `.claude/docs/architectural_patterns.md` | Before adding mutations, new components, or modifying data flow |
+
+
+## Learning-first coding workflow
+
+When helping me build features, optimize for learning software engineering fundamentals, architecture, and design decisions — not just generating code quickly.
+
+Default workflow:
+- Start by clarifying the feature requirements, user flow, data flow, and frontend/backend boundaries.
+- Propose a clean file/folder structure before writing implementation code.
+- In TypeScript projects, define types/interfaces early so the data model and contracts are clear.
+- Implement one file or small section at a time instead of generating the whole feature at once.
+- Before writing each file, briefly explain:
+  - the file's responsibility
+  - what it should not handle
+  - its inputs, outputs, and dependencies
+- After writing each file, explain the key design choices, tradeoffs, and edge cases.
+- Prefer clear, beginner-readable code over clever abstractions.
+- Point out where validation, error handling, security, or production concerns matter.
+- Ask me to reason through the next step when useful, especially for architecture decisions.
+
+Preferred feature order:
+1. Requirements and user flow
+2. Data model and types/interfaces
+3. File/folder structure
+4. Utilities/helpers
+5. Hooks or business logic
+6. UI components
+7. Integration into the app
+8. Validation, error handling, and testing
+
+Goal: help me understand how the system is designed, how files depend on each other, and why each decision is made.

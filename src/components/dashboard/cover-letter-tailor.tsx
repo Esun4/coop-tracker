@@ -13,6 +13,7 @@ import {
   CardContent,
 } from "@/components/ui/card";
 import { toast } from "sonner";
+import { PdfUpload } from "@/components/pdf_upload/pdfupload";
 
 export function CoverLetterTailor() {
   const [baseLetter, setBaseLetter] = useState("");
@@ -72,7 +73,19 @@ export function CoverLetterTailor() {
                 The template or existing letter you want to adapt.
               </CardDescription>
             </CardHeader>
-            <CardContent>
+            <CardContent className="space-y-4">
+              <PdfUpload
+                disabled={isGenerating}
+                onTextExtracted={(text) => {
+                  setBaseLetter(text);
+                  toast.success("Cover letter imported from PDF");
+                }}
+              />
+              <div className="flex items-center gap-3 text-xs text-muted-foreground">
+                <span className="h-px flex-1 bg-border" />
+                or paste it
+                <span className="h-px flex-1 bg-border" />
+              </div>
               <Label htmlFor="base-letter" className="sr-only">
                 Base cover letter
               </Label>
