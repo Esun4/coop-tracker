@@ -84,6 +84,23 @@ npm run test:watch      # watch mode
 3. Mocking rule: tests must **never** make real calls to OpenAI or the Gmail API. Mock these at the module boundary (`openai`, `googleapis`). Keep tests fast and deterministic with no external network.
 4. When you add a feature with new deterministic logic or a new mutation, add a matching high-value test in the appropriate tier.
 
+## Multi-agent worktree protocol
+
+This applies when I tell you I built changes using multiple agents or multiple git worktrees and want them combined. The normal case is several agents each building a different feature on the same project in parallel, in separate worktrees. Do not treat this as ordinary single-branch work.
+
+Worktree facts to keep in mind: each worktree is a separate folder with exactly one branch permanently checked out, and the same branch cannot be checked out in two worktrees at once. All worktrees share one history, so committed work is visible across them without pushing or pulling. Gitignored files such as .env, .env.test, and node_modules do not exist in a freshly created worktree and must be installed or copied before tests can run there.
+
+Merge sequence:
+
+1. Discover state. Run git worktree list and report every worktree, its path, and its branch. Identify the integration branch (normally main) and every feature branch to be merged. Run git status in each and report which have uncommitted work. Show me this summary and your planned merge order before changing anything.
+2. Commit everything. Any uncommitted change exists only in its folder and will merge nowhere. For each worktree with uncommitted work, show me the diff summary and the intended commit message, commit it, and confirm. Never stash or discard silently.
+3. Merge feature branches one at a time, not all at once. Switch to the integration branch and merge the first feature branch in. After each individual merge, run npm test. Merging one at a time and testing after each is deliberate: it makes any regression or conflict attributable to a specific feature rather than to a tangled combined merge.
+4. Handle conflicts deliberately. Because parallel features may touch shared files (the Prisma schema, shared components, shared route or config files, package.json, lockfiles), conflicts are more likely here than in a feature-plus-tests merge. For conflicts limited to package.json or lockfiles, keep both sides' dependencies and scripts. For a conflict in the Prisma schema or any application code, stop and show it to me rather than guessing, since the correct resolution depends on intent I may need to supply. After resolving, re-run npm test before moving to the next feature branch.
+5. Validate the combined result. After all feature branches are merged, ensure the integration branch has node_modules installed and any required .env / .env.test present, then run the full suite once more as the final confirmation. A green suite against the fully merged code is the signal the combination is correct.
+6. Clean up, but ask first. Propose removing the now-merged worktrees and deleting the merged branches (git worktree remove, git branch -d) and wait for my confirmation before running them.
+
+Core rule: do not report a merge as successful until the test suite has been run green against the final combined code. Combining branches without running the suite against the result confirms nothing.
+
 ## Additional Documentation
 
 Check these when working in the relevant area:
