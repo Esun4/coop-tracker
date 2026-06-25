@@ -8,6 +8,7 @@ import OpenAI from "openai";
 import { revalidatePath } from "next/cache";
 import { ApplicationStatus, SuggestedAction } from "@/generated/prisma/client";
 import { encrypt, tryDecrypt } from "@/lib/crypto";
+import { extractCompanyFromSender } from "@/lib/email-parsing";
 import pLimit from "p-limit";
 
 async function getAuthUserId(): Promise<string> {
@@ -27,34 +28,6 @@ function extractEmailBody(payload: gmail_v1.Schema$MessagePart): string {
     }
   }
   return "";
-}
-
-const IGNORED_SENDER_DOMAINS = new Set([
-  "gmail", "yahoo", "outlook", "hotmail", "icloud", "protonmail",
-  "indeed", "linkedin", "glassdoor", "handshake", "ziprecruiter",
-  "monster", "waterlooworks", "myworkdayjobs", "greenhouse", "lever",
-  "workable", "ashbyhq", "jobvite", "icims", "taleo", "successfactors",
-]);
-
-function extractCompanyFromSender(from: string): string | null {
-  const displayMatch = from.match(/^"?([^"<]+?)"?\s*</);
-  if (displayMatch) {
-    const name = displayMatch[1].trim();
-    if (!/^(no.?reply|do.?not.?reply|recruiting|careers|hr|jobs|talent|hiring|notifications?|alerts?|support|info|hello|team|noreply)$/i.test(name)) {
-      return name;
-    }
-  }
-
-  const emailMatch = from.match(/@([^>>\s]+)/);
-  if (emailMatch) {
-    const parts = emailMatch[1].split(".");
-    const domain = parts.length >= 2 ? parts[parts.length - 2] : parts[0];
-    if (!IGNORED_SENDER_DOMAINS.has(domain.toLowerCase())) {
-      return domain.charAt(0).toUpperCase() + domain.slice(1);
-    }
-  }
-
-  return null;
 }
 
 const SYSTEM_PROMPT = `You classify emails related to job/internship applications. Return JSON with:
