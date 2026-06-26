@@ -10,5 +10,8 @@ export default defineConfig({
   },
   datasource: {
     url: process.env["DATABASE_URL"],
+    // Local, disposable DB that `migrate dev` resets to validate migrations.
+    // MUST point at an empty throwaway database — never one with real data.
+    shadowDatabaseUrl: process.env["SHADOW_DATABASE_URL"],
   },
 });

@@ -25,11 +25,8 @@ vi.mock("@/lib/prisma", () => ({
 vi.mock("@/lib/auth", () => ({ auth: vi.fn() }));
 
 import { auth } from "@/lib/auth";
-import {
-  generateCoverLetter,
-  buildUserPrompt,
-  SYSTEM_PROMPT,
-} from "@/lib/actions/cover-letter";
+import { generateCoverLetter } from "@/lib/actions/cover-letter";
+import { buildUserPrompt, SYSTEM_PROMPT } from "@/lib/cover-letter-prompt";
 
 const mockedAuth = vi.mocked(auth);
 

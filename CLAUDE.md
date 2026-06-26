@@ -38,6 +38,22 @@ npx prisma generate                      # Regenerate client after schema change
 npx prisma migrate dev --name <name>     # Create and apply migration
 ```
 
+## Database Migrations (REQUIRED workflow)
+
+**Use ONE workflow for all schema changes — never mix them, or the migration history drifts from the live DB.**
+
+1. Edit `prisma/schema.prisma`.
+2. `npx prisma migrate dev --name <change>` — generates a migration file *and* applies it.
+3. Commit the new `prisma/migrations/<...>` folder **together with** the schema change.
+
+- **Never** use `prisma db push` or hand-written SQL against the real (Supabase) DB — that changes the DB without a migration file and causes drift. (`db push` is only correct against the disposable test container in `scripts/setup-test-db.mjs`.)
+- **Shadow database (required):** `migrate dev` needs a throwaway DB to validate migrations, and the Supabase pooler blocks auto-creating one. It's wired via `SHADOW_DATABASE_URL` in `.env` → `datasource.shadowDatabaseUrl` in `prisma.config.ts`. It **must be a separate, empty, local DB — never one with real data** (Prisma wipes it on every run). Start it with:
+  ```bash
+  docker run -d --name apptracker-shadow-db -e POSTGRES_USER=postgres -e POSTGRES_PASSWORD=shadow -e POSTGRES_DB=prisma_shadow -p 127.0.0.1:5434:5432 postgres:16-alpine
+  ```
+- If `migrate dev` ever proposes a **reset/wipe** of the real DB, **stop** — that means drift; reconcile by baselining (squash to a fresh `migrations/0_init` from the current schema and `prisma migrate resolve --applied 0_init`), do not let it reset.
+- Production/CI applies migrations with `prisma migrate deploy` (replays files, never resets).
+
 ## Critical Non-Obvious Facts
 
 - Prisma v7 requires `PrismaPg` adapter — see `src/lib/prisma.ts`
