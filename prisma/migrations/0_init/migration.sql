@@ -1,8 +1,14 @@
+-- CreateSchema
+CREATE SCHEMA IF NOT EXISTS "public";
+
 -- CreateEnum
-CREATE TYPE "ApplicationStatus" AS ENUM ('APPLYING', 'APPLIED', 'OA', 'INTERVIEW', 'FINAL_ROUND', 'OFFER', 'REJECTED', 'WITHDRAWN');
+CREATE TYPE "ApplicationStatus" AS ENUM ('APPLIED', 'OA', 'INTERVIEW', 'FINAL_ROUND', 'OFFER', 'REJECTED', 'WITHDRAWN');
 
 -- CreateEnum
 CREATE TYPE "SuggestedAction" AS ENUM ('NEW_APPLICATION', 'STATUS_UPDATE');
+
+-- CreateEnum
+CREATE TYPE "ActivitySource" AS ENUM ('manual', 'csv_import', 'email_suggestion');
 
 -- CreateTable
 CREATE TABLE "User" (
@@ -67,7 +73,7 @@ CREATE TABLE "Application" (
     "roleTitle" TEXT NOT NULL,
     "location" TEXT,
     "applicationDate" TIMESTAMP(3),
-    "status" "ApplicationStatus" NOT NULL DEFAULT 'APPLYING',
+    "status" "ApplicationStatus" NOT NULL DEFAULT 'APPLIED',
     "source" TEXT,
     "notes" TEXT,
     "contactInfo" TEXT,
@@ -93,6 +99,8 @@ CREATE TABLE "EmailSuggestion" (
     "suggestedRole" TEXT,
     "confidence" DOUBLE PRECISION NOT NULL,
     "reasoning" TEXT,
+    "emailThreadId" TEXT,
+    "replySentAt" TIMESTAMP(3),
     "applicationId" TEXT,
     "resolved" BOOLEAN NOT NULL DEFAULT false,
     "resolvedAction" TEXT,
@@ -109,10 +117,20 @@ CREATE TABLE "ActivityLog" (
     "applicationId" TEXT,
     "action" TEXT NOT NULL,
     "details" JSONB,
-    "source" TEXT NOT NULL DEFAULT 'manual',
+    "source" "ActivitySource" NOT NULL DEFAULT 'manual',
     "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
 
     CONSTRAINT "ActivityLog_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "RateLimitEvent" (
+    "id" TEXT NOT NULL,
+    "userId" TEXT NOT NULL,
+    "feature" TEXT NOT NULL,
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+
+    CONSTRAINT "RateLimitEvent_pkey" PRIMARY KEY ("id")
 );
 
 -- CreateIndex
@@ -137,6 +155,12 @@ CREATE INDEX "Application_userId_status_idx" ON "Application"("userId", "status"
 CREATE INDEX "Application_userId_archived_idx" ON "Application"("userId", "archived");
 
 -- CreateIndex
+CREATE INDEX "Application_userId_archived_status_idx" ON "Application"("userId", "archived", "status");
+
+-- CreateIndex
+CREATE INDEX "Application_userId_source_idx" ON "Application"("userId", "source");
+
+-- CreateIndex
 CREATE UNIQUE INDEX "EmailSuggestion_emailMessageId_key" ON "EmailSuggestion"("emailMessageId");
 
 -- CreateIndex
@@ -147,6 +171,9 @@ CREATE INDEX "ActivityLog_userId_idx" ON "ActivityLog"("userId");
 
 -- CreateIndex
 CREATE INDEX "ActivityLog_applicationId_idx" ON "ActivityLog"("applicationId");
+
+-- CreateIndex
+CREATE INDEX "RateLimitEvent_userId_feature_createdAt_idx" ON "RateLimitEvent"("userId", "feature", "createdAt");
 
 -- AddForeignKey
 ALTER TABLE "Account" ADD CONSTRAINT "Account_userId_fkey" FOREIGN KEY ("userId") REFERENCES "User"("id") ON DELETE CASCADE ON UPDATE CASCADE;
@@ -165,3 +192,7 @@ ALTER TABLE "ActivityLog" ADD CONSTRAINT "ActivityLog_userId_fkey" FOREIGN KEY (
 
 -- AddForeignKey
 ALTER TABLE "ActivityLog" ADD CONSTRAINT "ActivityLog_applicationId_fkey" FOREIGN KEY ("applicationId") REFERENCES "Application"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "RateLimitEvent" ADD CONSTRAINT "RateLimitEvent_userId_fkey" FOREIGN KEY ("userId") REFERENCES "User"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+

@@ -25,6 +25,7 @@ model User {
   applications    Application[]
   emailSuggestions EmailSuggestion[]
   activityLogs    ActivityLog[]
+  rateLimitEvents RateLimitEvent[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -168,4 +169,19 @@ model ActivityLog {
 
   @@index([userId])
   @@index([applicationId])
+}
+
+// A pure timestamp ledger for per-user, per-feature rate limiting. Stores no
+// generated content — only that a rate-limited action ran. Reused across
+// features via the `feature` discriminator (e.g. "cover_letter", later
+// "resume_tailor"), each getting its own independent budget.
+model RateLimitEvent {
+  id        String   @id @default(cuid())
+  userId    String
+  feature   String
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, feature, createdAt])
 }

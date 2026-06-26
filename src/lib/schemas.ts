@@ -32,6 +32,21 @@ export const statusColors: Record<ApplicationStatusType, string> = {
   WITHDRAWN: "bg-gray-100 text-gray-800",
 };
 
+// Inputs for cover-letter tailoring. Bounds serve two jobs: reject junk before
+// spending an OpenAI call (min), and cap cost/latency of any single request (max).
+export const coverLetterSchema = z.object({
+  baseLetter: z
+    .string()
+    .min(100, "Your base cover letter looks too short — paste the full letter.")
+    .max(8000, "Your base cover letter is too long (8,000 character max)."),
+  jobDescription: z
+    .string()
+    .min(50, "The job description looks too short — paste more of the posting.")
+    .max(12000, "The job description is too long (12,000 character max)."),
+});
+
+export type CoverLetterFormData = z.infer<typeof coverLetterSchema>;
+
 export const applicationSchema = z.object({
   company: z.string().min(1, "Company is required"),
   roleTitle: z.string().min(1, "Role title is required"),

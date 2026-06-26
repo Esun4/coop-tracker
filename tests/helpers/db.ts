@@ -6,7 +6,7 @@ import { prisma } from "@/lib/prisma";
  */
 export async function resetDb() {
   await prisma.$executeRawUnsafe(
-    `TRUNCATE TABLE "ActivityLog", "EmailSuggestion", "Application", "Account", "Session", "User" RESTART IDENTITY CASCADE`
+    `TRUNCATE TABLE "RateLimitEvent", "ActivityLog", "EmailSuggestion", "Application", "Account", "Session", "User" RESTART IDENTITY CASCADE`
   );
 }
 

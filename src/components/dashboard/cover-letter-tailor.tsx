@@ -14,6 +14,7 @@ import {
 } from "@/components/ui/card";
 import { toast } from "sonner";
 import { PdfUpload } from "@/components/pdf_upload/pdfupload";
+import { generateCoverLetter } from "@/lib/actions/cover-letter";
 
 export function CoverLetterTailor() {
   const [baseLetter, setBaseLetter] = useState("");
@@ -29,10 +30,19 @@ export function CoverLetterTailor() {
 
   async function handleGenerate() {
     setIsGenerating(true);
-    // TODO: wire up to a server action that calls the LLM with
-    // { baseLetter, jobDescription } and returns the tailored letter.
-    // For now this is a static placeholder — no network/DB call is made.
-    setIsGenerating(false);
+    try {
+      const result = await generateCoverLetter({ baseLetter, jobDescription });
+      if ("error" in result) {
+        toast.error(result.error);
+        return;
+      }
+      setResult(result.letter);
+      toast.success("Tailored cover letter generated");
+    } catch {
+      toast.error("Something went wrong. Please try again.");
+    } finally {
+      setIsGenerating(false);
+    }
   }
 
   async function handleCopy() {

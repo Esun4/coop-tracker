@@ -6,6 +6,7 @@ vi.mock("next/cache", () => ({ revalidatePath: vi.fn() }));
 
 import { auth } from "@/lib/auth";
 import { getApplications, createApplication } from "@/lib/actions/applications";
+import { generateCoverLetter } from "@/lib/actions/cover-letter";
 
 const mockedAuth = vi.mocked(auth);
 
@@ -29,5 +30,12 @@ describe("auth boundary on protected server actions", () => {
   it("treats a session without a user id as unauthenticated", async () => {
     mockedAuth.mockResolvedValue({ user: {} } as never);
     await expect(getApplications()).rejects.toThrow("Unauthorized");
+  });
+
+  it("rejects an unauthenticated cover-letter generation with Unauthorized", async () => {
+    mockedAuth.mockResolvedValue(null as never);
+    await expect(
+      generateCoverLetter({ baseLetter: "x", jobDescription: "y" })
+    ).rejects.toThrow("Unauthorized");
   });
 });
