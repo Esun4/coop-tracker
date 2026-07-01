@@ -16,6 +16,7 @@ import {
   ArchiveRestore,
   ChevronUp,
   ChevronDown,
+  Inbox,
 } from "lucide-react";
 import {
   statusLabels,
@@ -37,6 +38,27 @@ interface ApplicationTableProps {
   sortOrder: "asc" | "desc";
   onSort: (column: string) => void;
   onUpdate?: () => void;
+}
+
+const GRID_COLS =
+  "[grid-template-columns:1.25fr_1.3fr_118px_76px_110px_96px_40px]";
+
+// Deterministic accent per company so monograms are stable across renders.
+const MONOGRAM_HUES = [
+  "bg-indigo-500/12 text-indigo-700 dark:bg-indigo-400/15 dark:text-indigo-300",
+  "bg-emerald-500/12 text-emerald-700 dark:bg-emerald-400/15 dark:text-emerald-300",
+  "bg-amber-500/15 text-amber-700 dark:bg-amber-400/15 dark:text-amber-300",
+  "bg-purple-500/12 text-purple-700 dark:bg-purple-400/15 dark:text-purple-300",
+  "bg-rose-500/12 text-rose-700 dark:bg-rose-400/15 dark:text-rose-300",
+  "bg-sky-500/12 text-sky-700 dark:bg-sky-400/15 dark:text-sky-300",
+];
+
+function monogramClass(name: string): string {
+  let hash = 0;
+  for (let i = 0; i < name.length; i++) {
+    hash = (hash * 31 + name.charCodeAt(i)) | 0;
+  }
+  return MONOGRAM_HUES[Math.abs(hash) % MONOGRAM_HUES.length];
 }
 
 function InlineStatusSelect({
@@ -124,11 +146,11 @@ export function ApplicationTable({
     const active = sortBy === column;
     return (
       <button
-        className="flex items-center gap-1 text-xs font-medium uppercase tracking-wider transition-colors"
-        style={{
-          color: active ? "oklch(0.145 0 0)" : "oklch(0.556 0 0)",
-          letterSpacing: "0.08em",
-        }}
+        className={`flex items-center gap-1 text-xs font-medium uppercase tracking-[0.08em] transition-colors ${
+          active
+            ? "text-foreground"
+            : "text-muted-foreground hover:text-foreground"
+        }`}
         onClick={() => onSort(column)}
       >
         {children}
@@ -147,7 +169,10 @@ export function ApplicationTable({
 
   if (applications.length === 0) {
     return (
-      <div className="rounded-lg border bg-card py-16 text-center">
+      <div className="flex flex-col items-center rounded-xl border bg-card py-16 text-center shadow-xs">
+        <div className="mb-3 flex h-10 w-10 items-center justify-center rounded-full bg-muted text-muted-foreground">
+          <Inbox className="h-5 w-5" />
+        </div>
         <p className="font-heading text-lg mb-1 text-muted-foreground">
           No applications yet
         </p>
@@ -160,23 +185,17 @@ export function ApplicationTable({
 
   return (
     <>
-      <div className="rounded-lg border bg-card overflow-hidden">
+      <div className="rounded-xl border bg-card overflow-hidden shadow-xs">
         {/* Header */}
-        <div
-          className="grid px-4 py-2.5 bg-muted/50"
-          style={{
-            gridTemplateColumns: "1fr 1fr 130px 100px 110px 90px 40px",
-            borderBottom: "1px solid oklch(0.922 0 0)",
-          }}
-        >
+        <div className={`grid px-4 py-2.5 bg-muted/50 border-b ${GRID_COLS}`}>
           <SortHeader column="company">Company</SortHeader>
           <SortHeader column="roleTitle">Role</SortHeader>
           <SortHeader column="status">Status</SortHeader>
           <SortHeader column="applicationDate">Date</SortHeader>
-          <span className="text-xs font-medium uppercase tracking-wider text-muted-foreground" style={{ letterSpacing: "0.08em" }}>
+          <span className="text-xs font-medium uppercase tracking-[0.08em] text-muted-foreground">
             Location
           </span>
-          <span className="text-xs font-medium uppercase tracking-wider text-muted-foreground" style={{ letterSpacing: "0.08em" }}>
+          <span className="text-xs font-medium uppercase tracking-[0.08em] text-muted-foreground">
             Source
           </span>
           <span />
@@ -187,16 +206,24 @@ export function ApplicationTable({
           {applications.map((app) => (
             <div
               key={app.id}
-              className="ledger-row grid px-4 py-3"
-              style={{
-                gridTemplateColumns: "1fr 1fr 130px 100px 110px 90px 40px",
-                borderBottom: "1px solid oklch(0.95 0 0)",
-                opacity: app.archived ? 0.45 : 1,
-                alignItems: "center",
-              }}
+              className={`ledger-row grid items-center px-4 py-3 border-b border-border/60 last:border-0 ${GRID_COLS} ${
+                app.archived ? "opacity-50" : ""
+              }`}
             >
-              <span className="text-sm font-medium truncate pr-2 text-foreground">
-                {app.company}
+              <span className="flex items-center gap-2.5 pr-2 min-w-0">
+                <span
+                  className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-xs font-semibold ${monogramClass(app.company)}`}
+                >
+                  {app.company.trim().charAt(0).toUpperCase() || "?"}
+                </span>
+                <span className="text-sm font-medium truncate text-foreground">
+                  {app.company}
+                </span>
+                {app.archived && (
+                  <span className="shrink-0 rounded border px-1 py-px text-[10px] uppercase tracking-wide text-muted-foreground">
+                    Archived
+                  </span>
+                )}
               </span>
               <span className="text-sm truncate pr-2 text-muted-foreground">
                 {app.roleTitle}

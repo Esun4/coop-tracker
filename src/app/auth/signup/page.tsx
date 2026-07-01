@@ -42,19 +42,20 @@ export default function SignUpPage() {
   return (
     <div className="min-h-screen flex bg-background">
       {/* Left decorative panel */}
-      <div className="hidden lg:flex lg:w-[420px] xl:w-[480px] flex-col justify-between p-12 bg-muted border-r">
-        <div>
-          <span className="font-heading text-2xl font-semibold text-foreground">coop</span>
-          <span className="font-heading text-2xl font-semibold text-primary">tracker</span>
+      <div className="hidden lg:flex lg:w-[420px] xl:w-[480px] flex-col justify-between p-12 bg-primary text-primary-foreground">
+        <div className="flex items-baseline">
+          <span className="font-heading text-2xl font-semibold">coop</span>
+          <span className="font-heading text-2xl font-semibold opacity-80">tracker</span>
+          <span className="ml-1 inline-block h-1.5 w-1.5 rounded-full bg-primary-foreground/80" />
         </div>
 
         <div className="space-y-6">
-          <h2 className="font-heading text-3xl xl:text-4xl font-semibold leading-tight text-foreground">
+          <h2 className="font-heading text-3xl xl:text-4xl font-semibold leading-tight">
             Start tracking
             <br />
-            <span className="text-muted-foreground">your journey.</span>
+            <span className="opacity-70">your journey.</span>
           </h2>
-          <p className="text-sm leading-relaxed text-muted-foreground">
+          <p className="text-sm leading-relaxed opacity-80">
             Join thousands of students organizing their internship and co-op applications.
           </p>
 
@@ -63,15 +64,18 @@ export default function SignUpPage() {
               { value: "100%", label: "Free forever" },
               { value: "∞", label: "Applications" },
             ].map((stat) => (
-              <div key={stat.label} className="rounded-lg border bg-background p-3">
-                <p className="font-mono text-lg font-medium text-foreground">{stat.value}</p>
-                <p className="text-xs mt-0.5 text-muted-foreground">{stat.label}</p>
+              <div
+                key={stat.label}
+                className="rounded-lg border border-primary-foreground/20 bg-primary-foreground/10 p-3"
+              >
+                <p className="font-mono text-lg font-medium">{stat.value}</p>
+                <p className="text-xs mt-0.5 opacity-75">{stat.label}</p>
               </div>
             ))}
           </div>
         </div>
 
-        <div className="h-px bg-border" />
+        <div className="h-px bg-primary-foreground/20" />
       </div>
 
       {/* Right: form */}

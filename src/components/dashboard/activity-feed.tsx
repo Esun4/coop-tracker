@@ -77,11 +77,11 @@ function timeAgo(date: Date): string {
 }
 
 function getIconColor(action: string, source: string): string {
-  if (source === "email_suggestion") return "#1D4ED8";
-  if (action === "created") return "#065F46";
-  if (action === "archived") return "#6B7280";
-  if (action === "unarchived") return "#B45309";
-  return "#374151";
+  if (source === "email_suggestion") return "text-blue-700 dark:text-blue-400";
+  if (action === "created") return "text-emerald-800 dark:text-emerald-400";
+  if (action === "archived") return "text-gray-500 dark:text-gray-400";
+  if (action === "unarchived") return "text-amber-700 dark:text-amber-400";
+  return "text-gray-700 dark:text-gray-300";
 }
 
 function ActivityItemMenu({
@@ -132,7 +132,7 @@ function ActivityItemMenu({
 
 export function ActivityFeed({ activities, onResolved }: ActivityFeedProps) {
   return (
-    <div className="rounded-lg border bg-card overflow-hidden">
+    <div className="rounded-xl border bg-card overflow-hidden shadow-xs">
       {/* Header */}
       <div className="px-4 py-3 border-b">
         <h3 className="text-xs font-medium uppercase tracking-widest text-muted-foreground">
@@ -167,7 +167,7 @@ export function ActivityFeed({ activities, onResolved }: ActivityFeedProps) {
                   <div
                     className="relative z-10 flex h-[26px] w-[26px] shrink-0 items-center justify-center rounded-full bg-background border"
                   >
-                    <Icon className="h-3 w-3" style={{ color: iconColor }} />
+                    <Icon className={`h-3 w-3 ${iconColor}`} />
                   </div>
 
                   {/* Content */}

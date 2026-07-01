@@ -61,7 +61,7 @@ export function CoverLetterTailor() {
     <div className="space-y-6">
       {/* Page heading */}
       <div className="space-y-1">
-        <h1 className="font-heading text-2xl font-semibold tracking-tight">
+        <h1 className="font-heading text-3xl font-semibold tracking-tight">
           Cover Letter Tailoring
         </h1>
         <p className="text-sm text-muted-foreground">

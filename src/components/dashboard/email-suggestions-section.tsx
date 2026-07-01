@@ -54,8 +54,10 @@ const actionLabels: Record<string, string> = {
 };
 
 const actionColors: Record<string, string> = {
-  NEW_APPLICATION: "bg-blue-100 text-blue-800",
-  STATUS_UPDATE: "bg-amber-100 text-amber-800",
+  NEW_APPLICATION:
+    "bg-blue-100 text-blue-800 dark:bg-blue-500/15 dark:text-blue-300",
+  STATUS_UPDATE:
+    "bg-amber-100 text-amber-800 dark:bg-amber-500/15 dark:text-amber-300",
 };
 
 const REPLY_WORTHY = ["INTERVIEW", "OA", "OFFER", "FINAL_ROUND"];
@@ -738,8 +740,8 @@ export function EmailSuggestionsSection({
   }
 
   return (
-    <div className="rounded-lg border bg-card">
-      <div className="flex items-center justify-between px-4 py-3">
+    <div className="rounded-xl border bg-card overflow-hidden shadow-xs">
+      <div className="flex items-center justify-between px-4 py-2.5">
         <button
           className="flex items-center gap-2 text-sm font-medium hover:opacity-70 transition-opacity"
           onClick={() => setCollapsed(!collapsed)}
@@ -801,9 +803,9 @@ export function EmailSuggestionsSection({
                     className="border-b last:border-0 hover:bg-muted/20 cursor-pointer"
                     onClick={() => openReviewAt(i)}
                   >
-                    <td className="px-4 py-3">
+                    <td className="px-4 py-2">
                       <span
-                        className={`inline-flex items-center justify-center rounded-full px-2.5 py-1 text-xs font-medium whitespace-nowrap ${
+                        className={`inline-flex items-center justify-center rounded-full px-2.5 py-0.5 text-xs font-medium whitespace-nowrap ${
                           actionColors[s.suggestedAction] ?? ""
                         }`}
                         style={{ minWidth: "110px" }}
@@ -811,15 +813,15 @@ export function EmailSuggestionsSection({
                         {actionLabels[s.suggestedAction] ?? s.suggestedAction}
                       </span>
                     </td>
-                    <td className="px-4 py-3 font-medium">
+                    <td className="px-4 py-2 font-medium">
                       {s.suggestedCompany ?? (
                         <span className="text-muted-foreground italic">Unknown</span>
                       )}
                     </td>
-                    <td className="px-4 py-3 text-muted-foreground">
+                    <td className="px-4 py-2 text-muted-foreground">
                       {s.suggestedRole ?? "—"}
                     </td>
-                    <td className="px-4 py-3">
+                    <td className="px-4 py-2">
                       <div className="flex items-center gap-2">
                         <div className="h-1.5 w-16 rounded-full bg-muted overflow-hidden">
                           <div
@@ -832,15 +834,15 @@ export function EmailSuggestionsSection({
                         </span>
                       </div>
                     </td>
-                    <td className="px-4 py-3 text-muted-foreground max-w-xs truncate">
+                    <td className="px-4 py-2 text-muted-foreground max-w-xs truncate">
                       {s.emailSubject}
                     </td>
-                    <td className="px-4 py-3">
+                    <td className="px-4 py-2">
                       <div className="flex items-center justify-end gap-1">
                         <Button
                           size="sm"
                           variant="ghost"
-                          className="h-7 w-7 p-0 text-green-600 hover:text-green-700 hover:bg-green-50"
+                          className="h-7 w-7 p-0 text-green-600 hover:text-green-700 hover:bg-green-50 dark:text-green-400 dark:hover:text-green-300 dark:hover:bg-green-500/10"
                           onClick={(e) => { e.stopPropagation(); setAccepting(s); }}
                           title="Accept"
                         >

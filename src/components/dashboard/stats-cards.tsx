@@ -1,5 +1,3 @@
-import { Briefcase, TrendingUp, BarChart3, XCircle } from "lucide-react";
-
 interface StatsCardsProps {
   stats: {
     total: number;
@@ -11,9 +9,8 @@ interface StatsCardsProps {
 interface StatCard {
   title: string;
   value: number;
-  icon: React.ComponentType<{ className?: string; style?: React.CSSProperties }>;
-  accent: string;
-  accentBg: string;
+  sub: string;
+  dot: string;
 }
 
 export function StatsCards({ stats }: StatsCardsProps) {
@@ -28,34 +25,35 @@ export function StatsCards({ stats }: StatsCardsProps) {
 
   const rejections = stats.byStatus.REJECTED || 0;
 
+  const pct = (n: number) =>
+    stats.total > 0 ? `${Math.round((n / stats.total) * 100)}% of total` : "—";
+
+  // Dot hues follow the status badge palette: indigo = applied/pending,
+  // purple = interview, red = rejected.
   const cards: StatCard[] = [
     {
       title: "Total",
       value: stats.total,
-      icon: Briefcase,
-      accent: "#374151",
-      accentBg: "rgba(55, 65, 81, 0.08)",
+      sub: "applications tracked",
+      dot: "bg-foreground/60",
     },
     {
       title: "Active",
       value: active,
-      icon: BarChart3,
-      accent: "#1D4ED8",
-      accentBg: "rgba(29, 78, 216, 0.07)",
+      sub: pct(active),
+      dot: "bg-indigo-500 dark:bg-indigo-400",
     },
     {
       title: "Interviews",
       value: interviews,
-      icon: TrendingUp,
-      accent: "#6D28D9",
-      accentBg: "rgba(109, 40, 217, 0.07)",
+      sub: pct(interviews),
+      dot: "bg-purple-500 dark:bg-purple-400",
     },
     {
       title: "Rejections",
       value: rejections,
-      icon: XCircle,
-      accent: "#B91C1C",
-      accentBg: "rgba(185, 28, 28, 0.07)",
+      sub: pct(rejections),
+      dot: "bg-red-500 dark:bg-red-400",
     },
   ];
 
@@ -64,45 +62,19 @@ export function StatsCards({ stats }: StatsCardsProps) {
       {cards.map((card, i) => (
         <div
           key={card.title}
-          className="relative rounded-lg overflow-hidden border bg-card animate-fade-up"
-          style={{
-            borderLeft: `3px solid ${card.accent}`,
-            animationDelay: `${i * 60}ms`,
-          }}
+          className="rounded-xl border bg-card px-5 py-4 shadow-xs animate-fade-up"
+          style={{ animationDelay: `${i * 60}ms` }}
         >
-          <div className="px-4 pt-4 pb-3">
-            <div className="flex items-center justify-between mb-3">
-              <p className="text-xs font-medium uppercase tracking-widest text-muted-foreground">
-                {card.title}
-              </p>
-              <div
-                className="flex h-7 w-7 items-center justify-center rounded-md"
-                style={{ background: card.accentBg }}
-              >
-                <card.icon
-                  className="h-3.5 w-3.5"
-                  style={{ color: card.accent }}
-                />
-              </div>
-            </div>
-            <p className="font-mono text-3xl font-medium leading-none text-foreground">
-              {card.value}
+          <div className="flex items-center gap-2">
+            <span className={`h-1.5 w-1.5 rounded-full ${card.dot}`} />
+            <p className="text-[11px] font-medium uppercase tracking-[0.14em] text-muted-foreground">
+              {card.title}
             </p>
           </div>
-
-          {stats.total > 0 && (
-            <div
-              style={{
-                position: "absolute",
-                bottom: 0,
-                left: 0,
-                height: "2px",
-                width: `${Math.min(100, (card.value / stats.total) * 100)}%`,
-                background: card.accent,
-                opacity: 0.3,
-              }}
-            />
-          )}
+          <p className="mt-2.5 font-heading text-4xl font-medium leading-none text-foreground">
+            {card.value}
+          </p>
+          <p className="mt-2 text-xs text-muted-foreground">{card.sub}</p>
         </div>
       ))}
     </div>

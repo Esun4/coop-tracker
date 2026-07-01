@@ -33,22 +33,23 @@ export default function SignInPage() {
   return (
     <div className="min-h-screen flex bg-background">
       {/* Left decorative panel */}
-      <div className="hidden lg:flex lg:w-[420px] xl:w-[480px] flex-col justify-between p-12 bg-muted border-r">
+      <div className="hidden lg:flex lg:w-[420px] xl:w-[480px] flex-col justify-between p-12 bg-primary text-primary-foreground">
         {/* Wordmark */}
-        <div>
-          <span className="font-heading text-2xl font-semibold text-foreground">coop</span>
-          <span className="font-heading text-2xl font-semibold text-primary">tracker</span>
+        <div className="flex items-baseline">
+          <span className="font-heading text-2xl font-semibold">coop</span>
+          <span className="font-heading text-2xl font-semibold opacity-80">tracker</span>
+          <span className="ml-1 inline-block h-1.5 w-1.5 rounded-full bg-primary-foreground/80" />
         </div>
 
         {/* Center content */}
         <div className="space-y-8">
           <div>
-            <h2 className="font-heading text-3xl xl:text-4xl font-semibold leading-tight mb-3 text-foreground">
+            <h2 className="font-heading text-3xl xl:text-4xl font-semibold leading-tight mb-3">
               Your career
               <br />
-              <span className="text-muted-foreground">at a glance.</span>
+              <span className="opacity-70">at a glance.</span>
             </h2>
-            <p className="text-sm leading-relaxed text-muted-foreground">
+            <p className="text-sm leading-relaxed opacity-80">
               Track every application, every status change, and every opportunity — all in one place.
             </p>
           </div>
@@ -60,14 +61,14 @@ export default function SignInPage() {
               "Analytics & funnel visualization",
             ].map((feature) => (
               <div key={feature} className="flex items-center gap-3">
-                <div className="h-1.5 w-1.5 rounded-full bg-foreground/40" />
-                <span className="text-sm text-muted-foreground">{feature}</span>
+                <div className="h-1.5 w-1.5 rounded-full bg-primary-foreground/60" />
+                <span className="text-sm opacity-80">{feature}</span>
               </div>
             ))}
           </div>
         </div>
 
-        <div className="h-px bg-border" />
+        <div className="h-px bg-primary-foreground/20" />
       </div>
 
       {/* Right: form panel */}

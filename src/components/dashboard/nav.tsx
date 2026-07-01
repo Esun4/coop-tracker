@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { signOut } from "next-auth/react";
+import { useTheme } from "next-themes";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -15,6 +16,8 @@ import {
   LayoutDashboard,
   FileText,
   BarChart2,
+  Sun,
+  Moon,
 } from "lucide-react";
 
 interface DashboardNavProps {
@@ -46,13 +49,14 @@ export function DashboardNav({ user }: DashboardNavProps) {
       <div className="flex h-14 items-center justify-between px-8 lg:px-16">
         {/* Wordmark + nav */}
         <div className="flex items-center gap-6 lg:gap-8">
-          <Link href="/dashboard" className="flex items-center shrink-0">
+          <Link href="/dashboard" className="flex items-baseline shrink-0">
             <span className="font-heading text-xl font-semibold tracking-tight text-foreground">
               coop
             </span>
             <span className="font-heading text-xl font-semibold tracking-tight text-primary">
               tracker
             </span>
+            <span className="ml-0.5 inline-block h-1.5 w-1.5 rounded-full bg-primary" />
           </Link>
 
           <nav className="flex items-center gap-1">
@@ -64,7 +68,7 @@ export function DashboardNav({ user }: DashboardNavProps) {
                   href={href}
                   className={`flex items-center gap-2 rounded-md px-3 py-1.5 text-sm font-medium transition-colors ${
                     active
-                      ? "bg-muted text-foreground"
+                      ? "bg-primary/10 text-primary"
                       : "text-muted-foreground hover:bg-muted hover:text-foreground"
                   }`}
                 >
@@ -76,8 +80,10 @@ export function DashboardNav({ user }: DashboardNavProps) {
           </nav>
         </div>
 
-        {/* User menu */}
-        <DropdownMenu>
+        {/* Theme toggle + user menu */}
+        <div className="flex items-center gap-2">
+          <ThemeToggle />
+          <DropdownMenu>
           <DropdownMenuTrigger
             render={
               <button className="flex items-center gap-2.5 rounded-md border px-2.5 py-1.5 text-sm text-muted-foreground transition-colors hover:bg-muted hover:text-foreground">
@@ -106,8 +112,25 @@ export function DashboardNav({ user }: DashboardNavProps) {
               Sign out
             </DropdownMenuItem>
           </DropdownMenuContent>
-        </DropdownMenu>
+          </DropdownMenu>
+        </div>
       </div>
     </header>
+  );
+}
+
+function ThemeToggle() {
+  const { resolvedTheme, setTheme } = useTheme();
+
+  return (
+    <button
+      onClick={() => setTheme(resolvedTheme === "dark" ? "light" : "dark")}
+      className="flex h-8 w-8 items-center justify-center rounded-md border text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+      aria-label="Toggle theme"
+    >
+      {/* Both icons rendered; CSS picks one so server and client markup match */}
+      <Sun className="h-4 w-4 dark:hidden" />
+      <Moon className="hidden h-4 w-4 dark:block" />
+    </button>
   );
 }

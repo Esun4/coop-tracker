@@ -6,9 +6,15 @@ import { ApplicationTable } from "./application-table";
 import { ApplicationForm } from "./application-form";
 import { FiltersToolbar } from "./filters-toolbar";
 import { ActivityFeed } from "./activity-feed";
-import { FunnelChart } from "./funnel-chart";
 import { EmailSuggestionsSection } from "./email-suggestions-section";
 import { ImportCsvDialog } from "./import-csv-dialog";
+import { Button } from "@/components/ui/button";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import {
   getApplications,
   getStats,
@@ -20,7 +26,14 @@ import { syncGmailEmails } from "@/lib/actions/gmail";
 import type { Application, EmailSuggestion } from "@/generated/prisma/client";
 import { statusLabels } from "@/lib/schemas";
 import { toast } from "sonner";
-import { BarChart2, List } from "lucide-react";
+import {
+  Plus,
+  Mail,
+  RefreshCw,
+  Download,
+  Upload,
+  MoreHorizontal,
+} from "lucide-react";
 
 interface DashboardData {
   applications: Application[];
@@ -46,7 +59,6 @@ export function DashboardClient({ initial }: { initial: DashboardData }) {
   const [isPending, startTransition] = useTransition();
   const [isSyncing, setIsSyncing] = useState(false);
   const [showImport, setShowImport] = useState(false);
-  const [showAnalytics, setShowAnalytics] = useState(false);
 
   const refresh = useCallback(() => {
     startTransition(async () => {
@@ -148,6 +160,74 @@ export function DashboardClient({ initial }: { initial: DashboardData }) {
 
   return (
     <div className="space-y-5">
+      {/* Page header: title + primary actions */}
+      <div className="flex flex-wrap items-end justify-between gap-3">
+        <div>
+          <h1 className="font-heading text-3xl font-semibold tracking-tight">
+            Dashboard
+          </h1>
+          <p className="mt-1 text-sm text-muted-foreground">
+            Track your co-op and internship applications in one place.
+          </p>
+        </div>
+
+        <div className="flex items-center gap-2">
+          <Button
+            variant="outline"
+            size="sm"
+            className="h-9 text-xs"
+            onClick={handleSyncGmail}
+            disabled={isSyncing}
+          >
+            {isSyncing ? (
+              <RefreshCw className="mr-1.5 h-3.5 w-3.5 animate-spin" />
+            ) : (
+              <Mail className="mr-1.5 h-3.5 w-3.5" />
+            )}
+            {isSyncing ? "Syncing…" : "Sync Gmail"}
+            {data.suggestions.length > 0 && !isSyncing && (
+              <span className="ml-1.5 flex h-4 w-4 items-center justify-center rounded-full bg-primary text-[10px] font-mono font-semibold text-primary-foreground">
+                {data.suggestions.length}
+              </span>
+            )}
+          </Button>
+
+          <DropdownMenu>
+            <DropdownMenuTrigger
+              render={
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="h-9 w-9 p-0"
+                  aria-label="Import or export"
+                >
+                  <MoreHorizontal className="h-4 w-4" />
+                </Button>
+              }
+            />
+            <DropdownMenuContent align="end">
+              <DropdownMenuItem onClick={() => setShowImport(true)}>
+                <Upload className="mr-2 h-3.5 w-3.5" />
+                Import CSV
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={handleExport}>
+                <Download className="mr-2 h-3.5 w-3.5" />
+                Export CSV
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+
+          <Button
+            size="sm"
+            className="h-9 text-xs"
+            onClick={() => setShowAddForm(true)}
+          >
+            <Plus className="mr-1.5 h-3.5 w-3.5" />
+            Add Application
+          </Button>
+        </div>
+      </div>
+
       <StatsCards stats={data.stats} />
 
       {data.suggestions.length > 0 && (
@@ -161,75 +241,34 @@ export function DashboardClient({ initial }: { initial: DashboardData }) {
       <div className="grid gap-5 lg:grid-cols-[1fr_280px]">
         {/* Main column */}
         <div className="space-y-3">
-          {showAnalytics ? (
-            <div className="rounded-lg border bg-card p-6">
-              <FunnelChart applications={data.applications} />
-            </div>
-          ) : (
-            <>
-              <FiltersToolbar
-                search={search}
-                onSearchChange={setSearch}
-                statusFilter={statusFilter}
-                onStatusFilterChange={setStatusFilter}
-                sourceFilter={sourceFilter}
-                onSourceFilterChange={setSourceFilter}
-                sources={data.sources}
-                showArchived={showArchived}
-                onShowArchivedChange={setShowArchived}
-                onAddNew={() => setShowAddForm(true)}
-                onSyncGmail={handleSyncGmail}
-                isSyncing={isSyncing}
-                pendingSuggestions={data.suggestions.length}
-                onExport={handleExport}
-                onImport={() => setShowImport(true)}
-              />
+          <FiltersToolbar
+            search={search}
+            onSearchChange={setSearch}
+            statusFilter={statusFilter}
+            onStatusFilterChange={setStatusFilter}
+            sourceFilter={sourceFilter}
+            onSourceFilterChange={setSourceFilter}
+            sources={data.sources}
+            showArchived={showArchived}
+            onShowArchivedChange={setShowArchived}
+          />
 
-              <div className={isPending ? "opacity-50 pointer-events-none transition-opacity" : "transition-opacity"}>
-                <ApplicationTable
-                  applications={[
-                    ...data.applications.filter((a) => a.status !== "REJECTED"),
-                    ...data.applications.filter((a) => a.status === "REJECTED"),
-                  ]}
-                  sortBy={sortBy}
-                  sortOrder={sortOrder}
-                  onSort={handleSort}
-                  onUpdate={refresh}
-                />
-              </div>
-            </>
-          )}
+          <div className={isPending ? "opacity-50 pointer-events-none transition-opacity" : "transition-opacity"}>
+            <ApplicationTable
+              applications={[
+                ...data.applications.filter((a) => a.status !== "REJECTED"),
+                ...data.applications.filter((a) => a.status === "REJECTED"),
+              ]}
+              sortBy={sortBy}
+              sortOrder={sortOrder}
+              onSort={handleSort}
+              onUpdate={refresh}
+            />
+          </div>
         </div>
 
         {/* Sidebar */}
-        <div className="space-y-3">
-          {/* View toggle */}
-          <div className="flex rounded-lg border bg-card overflow-hidden">
-            <button
-              className="flex flex-1 items-center justify-center gap-2 py-2.5 text-xs font-medium transition-colors"
-              style={{
-                background: !showAnalytics ? "oklch(0.97 0 0)" : "transparent",
-                color: !showAnalytics ? "oklch(0.145 0 0)" : "oklch(0.556 0 0)",
-                borderRight: "1px solid oklch(0.922 0 0)",
-              }}
-              onClick={() => setShowAnalytics(false)}
-            >
-              <List className="h-3.5 w-3.5" />
-              List
-            </button>
-            <button
-              className="flex flex-1 items-center justify-center gap-2 py-2.5 text-xs font-medium transition-colors"
-              style={{
-                background: showAnalytics ? "oklch(0.97 0 0)" : "transparent",
-                color: showAnalytics ? "oklch(0.145 0 0)" : "oklch(0.556 0 0)",
-              }}
-              onClick={() => setShowAnalytics(true)}
-            >
-              <BarChart2 className="h-3.5 w-3.5" />
-              Analytics
-            </button>
-          </div>
-
+        <div className="lg:sticky lg:top-7 lg:self-start">
           <ActivityFeed activities={data.activities} onResolved={refresh} />
         </div>
       </div>
