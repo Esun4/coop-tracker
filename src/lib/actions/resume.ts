@@ -7,24 +7,30 @@ import {
   resumeAnalyzeSchema,
   resumeTailorSchema,
   resumeCompareSchema,
+  resumeRefineSchema,
   type ResumeAnalyzeInput,
   type ResumeTailorInput,
   type ResumeCompareInput,
+  type ResumeRefineInput,
 } from "@/lib/schemas";
 import { checkRateLimit } from "@/lib/rate-limit";
 import {
   ANALYZE_SYSTEM_PROMPT,
   buildAnalyzePrompt,
   analyzeResponseSchema,
-  TAILOR_SYSTEM_PROMPT,
+  getTailorSystemPrompt,
   buildTailorPrompt,
   tailorResponseSchema,
   COMPARE_SYSTEM_PROMPT,
   buildComparePrompt,
   compareResponseSchema,
+  getRefineSystemPrompt,
+  buildRefinePrompt,
+  refineResponseSchema,
   type JobAnalysis,
   type TailoredResume,
   type ResumeComparison,
+  type RefinedResume,
 } from "@/lib/resume-prompt";
 
 // Same swap point rationale as cover-letter.ts. When the RAG layer lands,
@@ -123,7 +129,7 @@ export async function tailorResume(
 
   return runJsonStep(
     session.user.id,
-    TAILOR_SYSTEM_PROMPT,
+    getTailorSystemPrompt(parsedInput.data.format),
     buildTailorPrompt(
       parsedInput.data.resume,
       parsedInput.data.jobDescription,
@@ -131,6 +137,29 @@ export async function tailorResume(
     ),
     tailorResponseSchema,
     "Couldn't tailor your resume. Please try again."
+  );
+}
+
+/** Refine — apply one user instruction to the current draft (text or LaTeX). */
+export async function refineResume(
+  input: ResumeRefineInput
+): Promise<ActionResult<RefinedResume>> {
+  const session = await auth();
+  if (!session?.user?.id) throw new Error("Unauthorized");
+
+  const parsed = resumeRefineSchema.safeParse(input);
+  if (!parsed.success) return { error: parsed.error.issues[0].message };
+
+  return runJsonStep(
+    session.user.id,
+    getRefineSystemPrompt(parsed.data.format),
+    buildRefinePrompt(
+      parsed.data.resume,
+      parsed.data.instruction,
+      parsed.data.jobDescription
+    ),
+    refineResponseSchema,
+    "Couldn't apply that change. Please try again."
   );
 }
 
@@ -147,7 +176,11 @@ export async function compareResumes(
   return runJsonStep(
     session.user.id,
     COMPARE_SYSTEM_PROMPT,
-    buildComparePrompt(parsed.data.originalResume, parsed.data.tailoredResume),
+    buildComparePrompt(
+      parsed.data.originalResume,
+      parsed.data.tailoredResume,
+      parsed.data.format
+    ),
     compareResponseSchema,
     "Couldn't compare the resumes. Please try again."
   );

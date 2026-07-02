@@ -70,21 +70,40 @@ export const resumeAnalyzeSchema = z.object({
     .max(12000, "The job description is too long (12,000 character max)."),
 });
 
+// "text" = extracted/pasted resume prose; "latex" = the full .tex source of an
+// Overleaf resume, edited in place so the user's own template keeps compiling.
+export const resumeFormatSchema = z.enum(["text", "latex"]);
+
 export const resumeTailorSchema = resumeAnalyzeSchema.extend({
   resume: z
     .string()
     .min(200, "Your resume looks too short — paste the full resume.")
-    .max(15000, "Your resume is too long (15,000 character max)."),
+    .max(20000, "Your resume is too long (20,000 character max)."),
+  format: resumeFormatSchema.default("text"),
 });
 
 export const resumeCompareSchema = z.object({
-  originalResume: z.string().min(200).max(15000),
-  tailoredResume: z.string().min(200).max(15000),
+  originalResume: z.string().min(200).max(20000),
+  tailoredResume: z.string().min(200).max(20000),
+  format: resumeFormatSchema.default("text"),
 });
 
+export const resumeRefineSchema = z.object({
+  resume: z.string().min(200).max(20000),
+  instruction: z
+    .string()
+    .min(5, "Describe the change you want.")
+    .max(1000, "Keep the instruction under 1,000 characters."),
+  jobDescription: z.string().max(12000).optional(),
+  format: resumeFormatSchema.default("text"),
+});
+
+export type ResumeFormat = z.infer<typeof resumeFormatSchema>;
 export type ResumeAnalyzeInput = z.infer<typeof resumeAnalyzeSchema>;
-export type ResumeTailorInput = z.infer<typeof resumeTailorSchema>;
-export type ResumeCompareInput = z.infer<typeof resumeCompareSchema>;
+// z.input, not z.infer: `format` has a default, so callers may omit it.
+export type ResumeTailorInput = z.input<typeof resumeTailorSchema>;
+export type ResumeCompareInput = z.input<typeof resumeCompareSchema>;
+export type ResumeRefineInput = z.input<typeof resumeRefineSchema>;
 
 export const applicationSchema = z.object({
   company: z.string().min(1, "Company is required"),

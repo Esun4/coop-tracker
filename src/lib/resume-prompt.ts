@@ -5,6 +5,7 @@
 // analyze the posting → tailor the resume → compare the versions.
 
 import { z } from "zod";
+import type { ResumeFormat } from "@/lib/schemas";
 
 // Shared persona. Every step also gets JSON-output and no-fabrication rules —
 // grounding in the candidate's real resume is the whole point; a future RAG
@@ -113,6 +114,29 @@ ${keywords}
 Tailor the entire resume for this role, prioritizing the key responsibilities and important keywords above and following all of your rules. Respond with the JSON object only.`;
 }
 
+// The LaTeX contract: the model edits the user's Overleaf source in place, so
+// the output must still compile in their project untouched. Shared by the
+// tailor and refine steps in latex mode.
+const LATEX_RULES = `LATEX RULES (the input is a full .tex file from Overleaf):
+- Edit ONLY human-readable text content: bullet text, summary lines, skill lists, section text.
+- NEVER change the preamble, \\documentclass, \\usepackage lines, custom command definitions, environments, or document structure.
+- Keep every command invocation intact (e.g. \\resumeItem{...}, \\textbf{...}) — change only the text inside the braces where appropriate.
+- Escape LaTeX special characters in any text you write (\\% \\& \\# \\$ \\_).
+- Return the COMPLETE .tex file, byte-for-byte identical outside your text edits, so it can be pasted straight back into Overleaf and compiled.`;
+
+export const TAILOR_LATEX_SYSTEM_PROMPT = `${TAILOR_SYSTEM_PROMPT.replace(
+  "- Deliver the tailored resume in a full, traditional chronological format: section headings, a heading line for each job, bullets underneath. Plain text only — no markdown syntax, no comparison table.",
+  "- Deliver the tailored resume as the candidate's complete, modified .tex source (see LATEX RULES below)."
+)}
+
+${LATEX_RULES}
+
+In the JSON reply, "tailoredResume" is the complete modified .tex source.`;
+
+export function getTailorSystemPrompt(format: ResumeFormat): string {
+  return format === "latex" ? TAILOR_LATEX_SYSTEM_PROMPT : TAILOR_SYSTEM_PROMPT;
+}
+
 export const tailorResponseSchema = z.object({
   tailoredResume: z.string().min(100),
   quantificationFlags: z
@@ -145,8 +169,14 @@ Respond with a single JSON object, no other text, in exactly this shape:
 
 export function buildComparePrompt(
   originalResume: string,
-  tailoredResume: string
+  tailoredResume: string,
+  format: ResumeFormat = "text"
 ): string {
+  const latexNote =
+    format === "latex"
+      ? "\nBoth versions are LaTeX source files. Compare the human-readable CONTENT only — quote the changed text without LaTeX commands, and ignore unchanged markup.\n"
+      : "";
+
   return `ORIGINAL RESUME:
 """
 ${originalResume}
@@ -156,7 +186,7 @@ TAILORED RESUME:
 """
 ${tailoredResume}
 """
-
+${latexNote}
 List every meaningful change between the original and the tailored resume, following all of your rules. Respond with the JSON object only.`;
 }
 
@@ -174,3 +204,57 @@ export const compareResponseSchema = z.object({
 });
 
 export type ResumeComparison = z.infer<typeof compareResponseSchema>;
+
+// ── Refine: apply one user instruction to the current draft ────────────────
+
+export const REFINE_SYSTEM_PROMPT = `${PERSONA}
+
+You apply ONE requested change to the candidate's current resume draft.
+
+RULES:
+- Apply exactly what the instruction asks — change nothing else.
+- NEVER invent, add, or imply any experience, skill, employer, project, metric, or accomplishment that is not already in the draft (or explicitly provided in the instruction by the candidate themselves).
+- Do not exaggerate or inflate existing claims.
+- Keep the rest of the resume byte-for-byte unchanged.
+
+Respond with a single JSON object, no other text, in exactly this shape:
+{ "revised": string }   // the complete resume with the change applied`;
+
+export const REFINE_LATEX_SYSTEM_PROMPT = `${REFINE_SYSTEM_PROMPT.replace(
+  '{ "revised": string }   // the complete resume with the change applied',
+  '{ "revised": string }   // the complete modified .tex source with the change applied'
+)}
+
+${LATEX_RULES}`;
+
+export function getRefineSystemPrompt(format: ResumeFormat): string {
+  return format === "latex" ? REFINE_LATEX_SYSTEM_PROMPT : REFINE_SYSTEM_PROMPT;
+}
+
+export function buildRefinePrompt(
+  resume: string,
+  instruction: string,
+  jobDescription?: string
+): string {
+  const jd = jobDescription
+    ? `\nJOB DESCRIPTION (context for the change, do not add its claims to the resume):\n"""\n${jobDescription}\n"""\n`
+    : "";
+
+  return `CURRENT RESUME DRAFT:
+"""
+${resume}
+"""
+${jd}
+REQUESTED CHANGE:
+"""
+${instruction}
+"""
+
+Apply the requested change, following all of your rules. Respond with the JSON object only.`;
+}
+
+export const refineResponseSchema = z.object({
+  revised: z.string().min(100),
+});
+
+export type RefinedResume = z.infer<typeof refineResponseSchema>;

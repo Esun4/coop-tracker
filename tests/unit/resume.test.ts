@@ -29,13 +29,17 @@ import {
   analyzeJobForResume,
   tailorResume,
   compareResumes,
+  refineResume,
 } from "@/lib/actions/resume";
 import {
   buildAnalyzePrompt,
   buildTailorPrompt,
   buildComparePrompt,
+  buildRefinePrompt,
   ANALYZE_SYSTEM_PROMPT,
   TAILOR_SYSTEM_PROMPT,
+  getTailorSystemPrompt,
+  getRefineSystemPrompt,
   type JobAnalysis,
 } from "@/lib/resume-prompt";
 
@@ -98,6 +102,34 @@ describe("system prompts", () => {
   it("tailor prompt encodes the no-fabrication contract and the flag-don't-guess rule", () => {
     expect(TAILOR_SYSTEM_PROMPT).toMatch(/never invent/i);
     expect(TAILOR_SYSTEM_PROMPT).toMatch(/do not guess numbers/i);
+  });
+
+  it("latex tailor prompt swaps the plain-text rule for the LaTeX contract", () => {
+    const latex = getTailorSystemPrompt("latex");
+    // The template-literal replace must have actually fired.
+    expect(latex).not.toMatch(/plain text only/i);
+    expect(latex).toMatch(/preamble/i);
+    expect(latex).toMatch(/complete .*\.tex/i);
+    expect(latex).toMatch(/never invent/i);
+    // Text mode is untouched.
+    expect(getTailorSystemPrompt("text")).toBe(TAILOR_SYSTEM_PROMPT);
+  });
+
+  it("latex refine prompt carries both the single-change and LaTeX contracts", () => {
+    const latex = getRefineSystemPrompt("latex");
+    expect(latex).toMatch(/never invent/i);
+    expect(latex).toMatch(/preamble/i);
+    expect(getRefineSystemPrompt("text")).not.toMatch(/preamble/i);
+  });
+});
+
+describe("buildRefinePrompt", () => {
+  it("embeds the draft, the instruction, and optional job-description context", () => {
+    const prompt = buildRefinePrompt(RESUME, "shorten the second bullet", JOB_DESCRIPTION);
+    expect(prompt).toContain(RESUME);
+    expect(prompt).toContain("shorten the second bullet");
+    expect(prompt).toContain(JOB_DESCRIPTION);
+    expect(buildRefinePrompt(RESUME, "x y z")).not.toContain("JOB DESCRIPTION");
   });
 });
 
@@ -178,6 +210,40 @@ describe("tailorResume", () => {
     });
 
     expect(result).toMatchObject({ error: expect.stringMatching(/analysis step first/i) });
+    expect(createMock).not.toHaveBeenCalled();
+  });
+});
+
+describe("refineResume", () => {
+  it("returns the revised draft and spends one rate-limit event", async () => {
+    mockModelJson({ revised: RESUME + " (revised second bullet, now concise)" });
+
+    const result = await refineResume({
+      resume: RESUME,
+      instruction: "Make the second bullet more concise",
+      format: "text",
+    });
+
+    expect(result).toMatchObject({
+      success: true,
+      data: { revised: expect.stringContaining("revised second bullet") },
+    });
+    expect(createEventMock).toHaveBeenCalledTimes(1);
+
+    const userMsg = createMock.mock.calls[0][0].messages.find(
+      (m: { role: string }) => m.role === "user"
+    ).content;
+    expect(userMsg).toContain("Make the second bullet more concise");
+  });
+
+  it("rejects an empty instruction and never calls the model", async () => {
+    const result = await refineResume({
+      resume: RESUME,
+      instruction: "hi",
+      format: "text",
+    });
+
+    expect(result).toHaveProperty("error");
     expect(createMock).not.toHaveBeenCalled();
   });
 });

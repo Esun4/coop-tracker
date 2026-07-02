@@ -14,6 +14,7 @@ import {
   analyzeJobForResume,
   tailorResume,
   compareResumes,
+  refineResume,
 } from "@/lib/actions/resume";
 
 const mockedAuth = vi.mocked(auth);
@@ -68,6 +69,9 @@ describe("auth boundary on protected server actions", () => {
     ).rejects.toThrow("Unauthorized");
     await expect(
       compareResumes({ originalResume: "x", tailoredResume: "y" })
+    ).rejects.toThrow("Unauthorized");
+    await expect(
+      refineResume({ resume: "x", instruction: "shorten it" })
     ).rejects.toThrow("Unauthorized");
   });
 });
