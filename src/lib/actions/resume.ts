@@ -1,0 +1,154 @@
+"use server";
+
+import OpenAI from "openai";
+import type { z } from "zod";
+import { auth } from "@/lib/auth";
+import {
+  resumeAnalyzeSchema,
+  resumeTailorSchema,
+  resumeCompareSchema,
+  type ResumeAnalyzeInput,
+  type ResumeTailorInput,
+  type ResumeCompareInput,
+} from "@/lib/schemas";
+import { checkRateLimit } from "@/lib/rate-limit";
+import {
+  ANALYZE_SYSTEM_PROMPT,
+  buildAnalyzePrompt,
+  analyzeResponseSchema,
+  TAILOR_SYSTEM_PROMPT,
+  buildTailorPrompt,
+  tailorResponseSchema,
+  COMPARE_SYSTEM_PROMPT,
+  buildComparePrompt,
+  compareResponseSchema,
+  type JobAnalysis,
+  type TailoredResume,
+  type ResumeComparison,
+} from "@/lib/resume-prompt";
+
+// Same swap point rationale as cover-letter.ts. When the RAG layer lands,
+// these actions keep their signatures — retrieval widens the prompt, not the
+// contract.
+const MODEL = "gpt-4o-mini";
+
+// One tailoring session is up to 3 calls (analyze → tailor → compare), so the
+// bucket is sized for ~5 full sessions an hour, separate from cover letters.
+const RATE_LIMIT = 15;
+const RATE_WINDOW_MS = 60 * 60 * 1000; // 1 hour
+
+type ActionResult<T> = { success: true; data: T } | { error: string };
+
+// Shared plumbing for one JSON-mode model call: auth is already checked by the
+// caller; this validates quota, calls the model, and Zod-validates the reply
+// so a malformed model response becomes a clean error, never a broken page.
+async function runJsonStep<T>(
+  userId: string,
+  systemPrompt: string,
+  userPrompt: string,
+  responseSchema: z.ZodType<T>,
+  failureMessage: string
+): Promise<ActionResult<T>> {
+  const allowed = await checkRateLimit(
+    userId,
+    "resume_tailor",
+    RATE_LIMIT,
+    RATE_WINDOW_MS
+  );
+  if (!allowed) {
+    return {
+      error: `You've reached the limit of ${RATE_LIMIT} resume steps per hour. Try again later.`,
+    };
+  }
+
+  try {
+    const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+    const completion = await openai.chat.completions.create({
+      model: MODEL,
+      temperature: 0.4,
+      response_format: { type: "json_object" },
+      messages: [
+        { role: "system", content: systemPrompt },
+        { role: "user", content: userPrompt },
+      ],
+    });
+
+    const raw = completion.choices[0]?.message?.content;
+    if (!raw) return { error: failureMessage };
+
+    const parsed = responseSchema.safeParse(JSON.parse(raw));
+    if (!parsed.success) return { error: failureMessage };
+
+    return { success: true, data: parsed.data };
+  } catch {
+    return { error: failureMessage };
+  }
+}
+
+/** Step 1 — top responsibilities + keyword table from the job description. */
+export async function analyzeJobForResume(
+  input: ResumeAnalyzeInput
+): Promise<ActionResult<JobAnalysis>> {
+  const session = await auth();
+  if (!session?.user?.id) throw new Error("Unauthorized");
+
+  const parsed = resumeAnalyzeSchema.safeParse(input);
+  if (!parsed.success) return { error: parsed.error.issues[0].message };
+
+  return runJsonStep(
+    session.user.id,
+    ANALYZE_SYSTEM_PROMPT,
+    buildAnalyzePrompt(parsed.data.jobDescription),
+    analyzeResponseSchema,
+    "Couldn't analyze the job description. Please try again."
+  );
+}
+
+/** Step 2 — full tailored resume + quantification flags. */
+export async function tailorResume(
+  input: ResumeTailorInput & { analysis: JobAnalysis }
+): Promise<ActionResult<TailoredResume>> {
+  const session = await auth();
+  if (!session?.user?.id) throw new Error("Unauthorized");
+
+  const parsedInput = resumeTailorSchema.safeParse(input);
+  if (!parsedInput.success) return { error: parsedInput.error.issues[0].message };
+
+  // The analysis rides along from step 1; re-validate it rather than trusting
+  // the client shape.
+  const parsedAnalysis = analyzeResponseSchema.safeParse(input.analysis);
+  if (!parsedAnalysis.success) {
+    return { error: "Run the job analysis step first." };
+  }
+
+  return runJsonStep(
+    session.user.id,
+    TAILOR_SYSTEM_PROMPT,
+    buildTailorPrompt(
+      parsedInput.data.resume,
+      parsedInput.data.jobDescription,
+      parsedAnalysis.data
+    ),
+    tailorResponseSchema,
+    "Couldn't tailor your resume. Please try again."
+  );
+}
+
+/** Step 3 — side-by-side table of what changed and why. */
+export async function compareResumes(
+  input: ResumeCompareInput
+): Promise<ActionResult<ResumeComparison>> {
+  const session = await auth();
+  if (!session?.user?.id) throw new Error("Unauthorized");
+
+  const parsed = resumeCompareSchema.safeParse(input);
+  if (!parsed.success) return { error: parsed.error.issues[0].message };
+
+  return runJsonStep(
+    session.user.id,
+    COMPARE_SYSTEM_PROMPT,
+    buildComparePrompt(parsed.data.originalResume, parsed.data.tailoredResume),
+    compareResponseSchema,
+    "Couldn't compare the resumes. Please try again."
+  );
+}

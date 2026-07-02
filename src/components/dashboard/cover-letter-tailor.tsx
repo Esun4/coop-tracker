@@ -1,7 +1,15 @@
 "use client";
 
 import { useState } from "react";
-import { Sparkles, Copy, Check, FileText, Briefcase, Loader2 } from "lucide-react";
+import {
+  Sparkles,
+  Copy,
+  Check,
+  FileText,
+  Briefcase,
+  Loader2,
+  Download,
+} from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
@@ -15,6 +23,7 @@ import {
 import { toast } from "sonner";
 import { PdfUpload } from "@/components/pdf_upload/pdfupload";
 import { generateCoverLetter } from "@/lib/actions/cover-letter";
+import { useLetterExport } from "@/hooks/use-letter-export";
 
 export function CoverLetterTailor() {
   const [baseLetter, setBaseLetter] = useState("");
@@ -22,6 +31,9 @@ export function CoverLetterTailor() {
   const [result, setResult] = useState("");
   const [isGenerating, setIsGenerating] = useState(false);
   const [copied, setCopied] = useState(false);
+  // If the export shortened the letter to fit one page, the on-screen text is
+  // replaced so it always matches the downloaded PDF.
+  const { exportPdf, phase, isExporting } = useLetterExport(setResult);
 
   const canGenerate =
     baseLetter.trim().length > 0 &&
@@ -163,15 +175,30 @@ export function CoverLetterTailor() {
                   Your generated letter will appear here.
                 </CardDescription>
               </div>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={handleCopy}
-                disabled={!result}
-              >
-                {copied ? <Check /> : <Copy />}
-                {copied ? "Copied" : "Copy"}
-              </Button>
+              <div className="flex gap-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={handleCopy}
+                  disabled={!result}
+                >
+                  {copied ? <Check /> : <Copy />}
+                  {copied ? "Copied" : "Copy"}
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => exportPdf(result)}
+                  disabled={!result || isExporting}
+                >
+                  {isExporting ? <Loader2 className="animate-spin" /> : <Download />}
+                  {phase === "condensing"
+                    ? "Shortening…"
+                    : phase === "rendering"
+                      ? "Preparing…"
+                      : "PDF"}
+                </Button>
+              </div>
             </div>
           </CardHeader>
           <CardContent>

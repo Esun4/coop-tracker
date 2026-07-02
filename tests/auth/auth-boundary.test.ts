@@ -6,7 +6,15 @@ vi.mock("next/cache", () => ({ revalidatePath: vi.fn() }));
 
 import { auth } from "@/lib/auth";
 import { getApplications, createApplication } from "@/lib/actions/applications";
-import { generateCoverLetter } from "@/lib/actions/cover-letter";
+import {
+  generateCoverLetter,
+  condenseCoverLetter,
+} from "@/lib/actions/cover-letter";
+import {
+  analyzeJobForResume,
+  tailorResume,
+  compareResumes,
+} from "@/lib/actions/resume";
 
 const mockedAuth = vi.mocked(auth);
 
@@ -36,6 +44,30 @@ describe("auth boundary on protected server actions", () => {
     mockedAuth.mockResolvedValue(null as never);
     await expect(
       generateCoverLetter({ baseLetter: "x", jobDescription: "y" })
+    ).rejects.toThrow("Unauthorized");
+  });
+
+  it("rejects an unauthenticated cover-letter condense with Unauthorized", async () => {
+    mockedAuth.mockResolvedValue(null as never);
+    await expect(
+      condenseCoverLetter({ letter: "x", targetWords: 300 })
+    ).rejects.toThrow("Unauthorized");
+  });
+
+  it("rejects unauthenticated resume pipeline steps with Unauthorized", async () => {
+    mockedAuth.mockResolvedValue(null as never);
+    await expect(
+      analyzeJobForResume({ jobDescription: "x" })
+    ).rejects.toThrow("Unauthorized");
+    await expect(
+      tailorResume({
+        resume: "x",
+        jobDescription: "y",
+        analysis: { responsibilities: [], keywords: [] },
+      })
+    ).rejects.toThrow("Unauthorized");
+    await expect(
+      compareResumes({ originalResume: "x", tailoredResume: "y" })
     ).rejects.toThrow("Unauthorized");
   });
 });

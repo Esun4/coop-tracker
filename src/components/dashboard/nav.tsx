@@ -15,6 +15,7 @@ import {
   ChevronDown,
   LayoutDashboard,
   FileText,
+  FileUser,
   BarChart2,
   Sun,
   Moon,
@@ -30,6 +31,7 @@ interface DashboardNavProps {
 const navLinks = [
   { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
   { href: "/dashboard/cover-letter", label: "Cover Letter", icon: FileText },
+  { href: "/dashboard/resume", label: "Resume", icon: FileUser },
   { href: "/dashboard/analytics", label: "Analytics", icon: BarChart2 },
 ];
 

@@ -90,10 +90,7 @@ export function validateFile(
  *   error. A successfully-parsed-but-textless PDF (e.g. a scan) returns empty
  *   `text`, which the hook treats as the "no-text" case.
  */
-export async function extractText(
-  file: File,
-  onProgress?: (percent: number) => void,
-): Promise<ParsedPdf> {
+async function loadPdfjs() {
   const pdfjs = await import("pdfjs-dist");
 
   // Point pdfjs at its worker. `new URL(..., import.meta.url)` lets the bundler
@@ -102,6 +99,30 @@ export async function extractText(
     "pdfjs-dist/build/pdf.worker.min.mjs",
     import.meta.url,
   ).toString();
+
+  return pdfjs;
+}
+
+/**
+ * Page count of a rendered PDF. Used by the export flow to check whether the
+ * letter fits on one page — counting real rendered pages is exact where any
+ * word-count heuristic would only be a guess.
+ */
+export async function countPdfPages(blob: Blob): Promise<number> {
+  const pdfjs = await loadPdfjs();
+  const data = new Uint8Array(await blob.arrayBuffer());
+  const loadingTask = pdfjs.getDocument({ data });
+  const doc = await loadingTask.promise;
+  const pageCount = doc.numPages;
+  await loadingTask.destroy();
+  return pageCount;
+}
+
+export async function extractText(
+  file: File,
+  onProgress?: (percent: number) => void,
+): Promise<ParsedPdf> {
+  const pdfjs = await loadPdfjs();
 
   const data = new Uint8Array(await file.arrayBuffer());
   const doc = await pdfjs.getDocument({ data }).promise;

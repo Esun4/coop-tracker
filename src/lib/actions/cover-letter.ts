@@ -2,9 +2,19 @@
 
 import OpenAI from "openai";
 import { auth } from "@/lib/auth";
-import { coverLetterSchema, type CoverLetterFormData } from "@/lib/schemas";
+import {
+  coverLetterSchema,
+  condenseLetterSchema,
+  type CoverLetterFormData,
+  type CondenseLetterInput,
+} from "@/lib/schemas";
 import { checkRateLimit } from "@/lib/rate-limit";
-import { SYSTEM_PROMPT, buildUserPrompt } from "@/lib/cover-letter-prompt";
+import {
+  SYSTEM_PROMPT,
+  buildUserPrompt,
+  CONDENSE_SYSTEM_PROMPT,
+  buildCondensePrompt,
+} from "@/lib/cover-letter-prompt";
 
 // One-line swap point. Today's task (grounded rewording) doesn't justify a
 // bigger model; bump this only if output quality disappoints. RAG-era target
@@ -69,5 +79,57 @@ export async function generateCoverLetter(
     return { success: true, letter };
   } catch {
     return { error: "Couldn't generate your cover letter. Please try again." };
+  }
+}
+
+// Shortens an already-generated letter so it fits on one printed page (used by
+// the PDF export when the rendered letter overflows). Shares the cover_letter
+// rate-limit bucket with generation — both are paid model calls.
+export async function condenseCoverLetter(
+  input: CondenseLetterInput
+): Promise<GenerateResult> {
+  const session = await auth();
+  if (!session?.user?.id) throw new Error("Unauthorized");
+  const userId = session.user.id;
+
+  const parsed = condenseLetterSchema.safeParse(input);
+  if (!parsed.success) {
+    return { error: parsed.error.issues[0].message };
+  }
+  const { letter, targetWords } = parsed.data;
+
+  const allowed = await checkRateLimit(
+    userId,
+    "cover_letter",
+    RATE_LIMIT,
+    RATE_WINDOW_MS
+  );
+  if (!allowed) {
+    return {
+      error: `You've reached the limit of ${RATE_LIMIT} generations per hour. Try again later.`,
+    };
+  }
+
+  try {
+    const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+    const completion = await openai.chat.completions.create({
+      model: MODEL,
+      // Compression is a convergent task — keep the sampling tight so the
+      // shortened letter stays close to the original wording.
+      temperature: 0.3,
+      messages: [
+        { role: "system", content: CONDENSE_SYSTEM_PROMPT },
+        { role: "user", content: buildCondensePrompt(letter, targetWords) },
+      ],
+    });
+
+    const shortened = completion.choices[0]?.message?.content?.trim();
+    if (!shortened) {
+      return { error: "Couldn't shorten your cover letter. Please try again." };
+    }
+
+    return { success: true, letter: shortened };
+  } catch {
+    return { error: "Couldn't shorten your cover letter. Please try again." };
   }
 }

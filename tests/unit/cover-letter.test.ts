@@ -25,8 +25,16 @@ vi.mock("@/lib/prisma", () => ({
 vi.mock("@/lib/auth", () => ({ auth: vi.fn() }));
 
 import { auth } from "@/lib/auth";
-import { generateCoverLetter } from "@/lib/actions/cover-letter";
-import { buildUserPrompt, SYSTEM_PROMPT } from "@/lib/cover-letter-prompt";
+import {
+  generateCoverLetter,
+  condenseCoverLetter,
+} from "@/lib/actions/cover-letter";
+import {
+  buildUserPrompt,
+  SYSTEM_PROMPT,
+  buildCondensePrompt,
+  CONDENSE_SYSTEM_PROMPT,
+} from "@/lib/cover-letter-prompt";
 
 const mockedAuth = vi.mocked(auth);
 
@@ -54,6 +62,11 @@ describe("SYSTEM_PROMPT", () => {
   it("encodes the no-fabrication contract", () => {
     // The single most important guardrail must be present in the prompt.
     expect(SYSTEM_PROMPT).toMatch(/never invent|do not fabricate|not fabricate/i);
+  });
+
+  it("targets a full one-page body (~27 lines), excluding header and signature", () => {
+    expect(SYSTEM_PROMPT).toMatch(/27 printed lines/i);
+    expect(SYSTEM_PROMPT).toMatch(/signature/i);
   });
 });
 
@@ -119,5 +132,73 @@ describe("generateCoverLetter", () => {
     });
 
     expect(result).toMatchObject({ error: expect.stringMatching(/couldn't generate/i) });
+  });
+});
+
+describe("buildCondensePrompt", () => {
+  it("embeds the letter and the word target", () => {
+    const prompt = buildCondensePrompt(BASE_LETTER, 320);
+    expect(prompt).toContain(BASE_LETTER);
+    expect(prompt).toContain("320 words");
+  });
+});
+
+describe("CONDENSE_SYSTEM_PROMPT", () => {
+  it("encodes the no-fabrication contract", () => {
+    expect(CONDENSE_SYSTEM_PROMPT).toMatch(/never invent|do not fabricate|not fabricate/i);
+  });
+});
+
+describe("condenseCoverLetter", () => {
+  const LONG_LETTER = BASE_LETTER.repeat(3);
+
+  it("builds the condense prompt and returns the shortened letter", async () => {
+    createMock.mockResolvedValue({
+      choices: [{ message: { content: "Dear Hiring Team, shorter letter." } }],
+    });
+
+    const result = await condenseCoverLetter({
+      letter: LONG_LETTER,
+      targetWords: 300,
+    });
+
+    expect(result).toMatchObject({
+      success: true,
+      letter: "Dear Hiring Team, shorter letter.",
+    });
+
+    expect(createMock).toHaveBeenCalledTimes(1);
+    const callArg = createMock.mock.calls[0][0];
+    const systemMsg = callArg.messages.find((m: { role: string }) => m.role === "system").content;
+    const userMsg = callArg.messages.find((m: { role: string }) => m.role === "user").content;
+    expect(systemMsg).toMatch(/never invent|do not fabricate|not fabricate/i);
+    expect(userMsg).toContain(LONG_LETTER);
+    expect(userMsg).toContain("300 words");
+
+    // A condense pass spends the same rate-limit quota as a generation.
+    expect(createEventMock).toHaveBeenCalledTimes(1);
+  });
+
+  it("rejects an out-of-range word target and never calls the model", async () => {
+    const result = await condenseCoverLetter({
+      letter: LONG_LETTER,
+      targetWords: 50, // below the 150-word floor
+    });
+
+    expect(result).toHaveProperty("error");
+    expect(createMock).not.toHaveBeenCalled();
+    expect(createEventMock).not.toHaveBeenCalled();
+  });
+
+  it("returns a rate-limit error and never calls the model when over the limit", async () => {
+    countMock.mockResolvedValue(10); // already at the cap
+
+    const result = await condenseCoverLetter({
+      letter: LONG_LETTER,
+      targetWords: 300,
+    });
+
+    expect(result).toMatchObject({ error: expect.stringMatching(/limit of 10/i) });
+    expect(createMock).not.toHaveBeenCalled();
   });
 });

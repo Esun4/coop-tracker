@@ -47,6 +47,45 @@ export const coverLetterSchema = z.object({
 
 export type CoverLetterFormData = z.infer<typeof coverLetterSchema>;
 
+// Input for the one-page condense pass of the PDF export. The letter normally
+// comes from our own generator, but Server Actions are directly invocable, so
+// it gets the same junk/cost bounds as generation. targetWords is clamped to
+// the range that plausibly fits a one-page letter.
+export const condenseLetterSchema = z.object({
+  letter: z
+    .string()
+    .min(100, "There's no letter to shorten yet.")
+    .max(12000, "The letter is too long to shorten (12,000 character max)."),
+  targetWords: z.number().int().min(150).max(450),
+});
+
+export type CondenseLetterInput = z.infer<typeof condenseLetterSchema>;
+
+// Inputs for the resume tailoring pipeline. Same philosophy as the cover
+// letter bounds: reject junk before spending an OpenAI call, cap cost after.
+export const resumeAnalyzeSchema = z.object({
+  jobDescription: z
+    .string()
+    .min(50, "The job description looks too short — paste more of the posting.")
+    .max(12000, "The job description is too long (12,000 character max)."),
+});
+
+export const resumeTailorSchema = resumeAnalyzeSchema.extend({
+  resume: z
+    .string()
+    .min(200, "Your resume looks too short — paste the full resume.")
+    .max(15000, "Your resume is too long (15,000 character max)."),
+});
+
+export const resumeCompareSchema = z.object({
+  originalResume: z.string().min(200).max(15000),
+  tailoredResume: z.string().min(200).max(15000),
+});
+
+export type ResumeAnalyzeInput = z.infer<typeof resumeAnalyzeSchema>;
+export type ResumeTailorInput = z.infer<typeof resumeTailorSchema>;
+export type ResumeCompareInput = z.infer<typeof resumeCompareSchema>;
+
 export const applicationSchema = z.object({
   company: z.string().min(1, "Company is required"),
   roleTitle: z.string().min(1, "Role title is required"),
