@@ -2,12 +2,15 @@
 
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
-import { applicationSchema } from "@/lib/schemas";
+import { applicationSchema, applicationStatuses } from "@/lib/schemas";
+import { z } from "zod";
 import { revalidatePath } from "next/cache";
 import { ApplicationStatus, ActivitySource } from "@/generated/prisma/client";
 import OpenAI from "openai";
 import { google } from "googleapis";
 import { encrypt, tryDecrypt } from "@/lib/crypto";
+
+const statusSchema = z.enum(applicationStatuses);
 
 async function getAuthUserId(): Promise<string> {
   const session = await auth();
@@ -216,6 +219,9 @@ export async function acceptStatusUpdate(
 ) {
   const userId = await getAuthUserId();
 
+  const parsedStatus = statusSchema.safeParse(newStatus);
+  if (!parsedStatus.success) return { error: "Invalid status" };
+
   const suggestion = await prisma.emailSuggestion.findFirst({
     where: { id: suggestionId, userId },
   });
@@ -228,7 +234,7 @@ export async function acceptStatusUpdate(
 
   await prisma.application.update({
     where: { id: applicationId },
-    data: { status: newStatus as ApplicationStatus },
+    data: { status: parsedStatus.data as ApplicationStatus },
   });
 
   await prisma.activityLog.create({

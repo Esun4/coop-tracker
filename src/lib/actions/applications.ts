@@ -2,7 +2,7 @@
 
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
-import { applicationSchema, applicationStatuses } from "@/lib/schemas";
+import { applicationSchema, applicationStatuses, type ApplicationFormData } from "@/lib/schemas";
 import { revalidatePath } from "next/cache";
 import { ApplicationStatus, ActivitySource } from "@/generated/prisma/client";
 import { z } from "zod";
@@ -52,10 +52,21 @@ export async function getApplications(params?: {
   // Clean undefined values
   if (where.archived === undefined) delete where.archived;
 
-  const orderBy: Record<string, string> = {};
-  const sortBy = params?.sortBy || "updatedAt";
-  const sortOrder = params?.sortOrder || "desc";
-  orderBy[sortBy] = sortOrder;
+  // Allowlist the sortable columns: sortBy is caller-controlled and flows into
+  // Prisma's orderBy, so an unknown field would throw a validation error.
+  const SORTABLE_COLUMNS = [
+    "updatedAt",
+    "createdAt",
+    "company",
+    "roleTitle",
+    "status",
+    "applicationDate",
+  ] as const;
+  const sortBy = (SORTABLE_COLUMNS as readonly string[]).includes(params?.sortBy ?? "")
+    ? (params!.sortBy as string)
+    : "updatedAt";
+  const sortOrder = params?.sortOrder === "asc" ? "asc" : "desc";
+  const orderBy: Record<string, "asc" | "desc"> = { [sortBy]: sortOrder };
 
   return prisma.application.findMany({
     where,
@@ -269,14 +280,31 @@ export async function importApplications(
 
   const now = new Date();
 
+  // Validate every row through the same schema as manual creates BEFORE writing
+  // anything. Import used to skip validation entirely, so blank/invalid rows
+  // (empty company, bogus status, unparseable date) either persisted silently
+  // or threw an unhandled Prisma error mid-transaction. Fail the whole import
+  // with a row-numbered message instead.
+  const parsedRows: ApplicationFormData[] = [];
+  for (let i = 0; i < rows.length; i++) {
+    const parsed = applicationSchema.safeParse(rows[i]);
+    if (!parsed.success) {
+      return {
+        success: false,
+        error: `Row ${i + 1}: ${parsed.error.issues[0].message}`,
+      };
+    }
+    parsedRows.push(parsed.data);
+  }
+
   const created = await prisma.$transaction(
-    rows.map((row) =>
+    parsedRows.map((row) =>
       prisma.application.create({
         data: {
           userId,
           company: row.company,
           roleTitle: row.roleTitle,
-          status: (row.status as ApplicationStatus) ?? "APPLIED",
+          status: row.status as ApplicationStatus,
           location: row.location || null,
           applicationDate: row.applicationDate ? new Date(row.applicationDate) : now,
           source: row.source || null,
