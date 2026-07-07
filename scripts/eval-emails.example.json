@@ -1,0 +1,23 @@
+[
+  {
+    "subject": "Thank you for applying to Stripe!",
+    "from": "Stripe Recruiting <no-reply@stripe.com>",
+    "snippet": "We received your application for Software Engineer Intern...",
+    "body": "Hi Ethan,\n\nThanks for applying to the Software Engineer Intern position at Stripe. We've received your application and our team will review it shortly.\n\nBest,\nStripe Recruiting",
+    "label": { "action": "NEW_APPLICATION" }
+  },
+  {
+    "subject": "Update on your application - Shopify",
+    "from": "Shopify Talent <talent@shopify.com>",
+    "snippet": "After careful consideration, we have decided not to move forward...",
+    "body": "Hi Ethan,\n\nThank you for taking the time to apply to Shopify. After careful consideration, we have decided not to move forward with your candidacy at this time.\n\nWe encourage you to apply to future positions.\n\nShopify Talent Team",
+    "label": { "action": "STATUS_UPDATE" }
+  },
+  {
+    "subject": "Your weekly job alert from LinkedIn",
+    "from": "LinkedIn Job Alerts <jobalerts-noreply@linkedin.com>",
+    "snippet": "30 new jobs match your preferences: Software Engineer Intern...",
+    "body": "New jobs for you this week:\n- Software Engineer Intern at Acme Corp\n- Backend Developer Co-op at Example Inc\n\nView all jobs on LinkedIn.",
+    "label": { "action": "IRRELEVANT" }
+  }
+]
