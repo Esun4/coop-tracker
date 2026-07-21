@@ -68,10 +68,30 @@ try {
 }
 
 const VALID_ACTIONS = ["NEW_APPLICATION", "STATUS_UPDATE", "IRRELEVANT"];
+const isNonEmptyString = (value) =>
+  typeof value === "string" && value.trim().length > 0;
+
+if (!Array.isArray(emails) || emails.length === 0) {
+  console.error("Labels file must contain a non-empty JSON array of labeled emails.");
+  process.exit(1);
+}
+
 for (const [i, e] of emails.entries()) {
-  if (!e.subject || !e.from || !VALID_ACTIONS.includes(e.label?.action)) {
+  if (
+    !e ||
+    typeof e !== "object" ||
+    Array.isArray(e) ||
+    !isNonEmptyString(e.subject) ||
+    !isNonEmptyString(e.from) ||
+    (e.snippet != null && typeof e.snippet !== "string") ||
+    (e.body != null && typeof e.body !== "string") ||
+    !e.label ||
+    typeof e.label !== "object" ||
+    Array.isArray(e.label) ||
+    !VALID_ACTIONS.includes(e.label.action)
+  ) {
     console.error(
-      `Entry ${i + 1} is invalid: needs subject, from, and label.action one of ${VALID_ACTIONS.join(", ")}`
+      `Entry ${i + 1} is invalid: needs string subject, string from, optional string snippet/body, and label.action one of ${VALID_ACTIONS.join(", ")}`
     );
     process.exit(1);
   }
