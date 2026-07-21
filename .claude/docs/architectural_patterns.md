@@ -125,3 +125,15 @@ Consistent patterns prevent N+1 queries and over-fetching.
 - Use `include` for relations needed in one shot, `select` to limit columns
 - `distinct: ["source"]` for unique-value dropdowns
 - Schema indexes: `@@index([userId])`, `@@index([userId, status])`, `@@index([userId, archived])`
+
+---
+
+## 9. Validate Parsed File / External Inputs Before Use
+
+Anything read from a file or `JSON.parse` is untrusted-shaped, even in dev-only scripts. Validate the **container** and each entry's **types** before iterating or reading fields — don't assume `parse` returned the shape you expect.
+
+**Files:** `scripts/eval-classifier.mjs`
+
+- Guard the container first: after `JSON.parse`, confirm `Array.isArray(x) && x.length > 0` before `.entries()`/`.map()` — a JSON object or empty array otherwise crashes outside the validation path or yields `NaN%` metrics.
+- Validate each entry's field **types**, not just truthiness: `typeof e === "object" && !Array.isArray(e)`, required strings via a `isNonEmptyString` helper, optional fields as `x == null || typeof x === "string"`, nested objects (`e.label`) checked before dereferencing.
+- Fail loudly with a per-entry index and the expected shape, then `process.exit(1)`. A numeric `body` or `null` entry must produce a clear error, never a silent `NaN`.
