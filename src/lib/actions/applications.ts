@@ -6,6 +6,7 @@ import { applicationSchema, applicationStatuses, type ApplicationFormData } from
 import { revalidatePath } from "next/cache";
 import { ApplicationStatus, ActivitySource } from "@/generated/prisma/client";
 import { z } from "zod";
+import { syncDeadlineReminders } from "@/lib/actions/reminders";
 
 const statusSchema = z.enum(applicationStatuses);
 const MAX_IMPORT_ROWS = 1000;
@@ -203,6 +204,9 @@ export async function setApplicationDeadline(
       source: ActivitySource.manual,
     },
   });
+
+  // A date without the nudge it implies is only half the feature.
+  await syncDeadlineReminders(id);
 
   revalidatePath(`/dashboard/applications/${id}`);
   revalidatePath("/dashboard");

@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useTransition } from "react";
+import Link from "next/link";
 import { useTheme } from "next-themes";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
@@ -30,11 +31,12 @@ import {
 type Initial = Awaited<ReturnType<typeof getPreferences>>;
 
 const SECTIONS = [
-  "Account",
-  "Email sync",
-  "Appearance",
-  "Data & privacy",
-] as const;
+  { label: "Account", href: "/dashboard/settings" },
+  { label: "Email sync", href: "/dashboard/settings" },
+  { label: "Reminders", href: "/dashboard/settings/reminders" },
+  { label: "Appearance", href: "/dashboard/settings" },
+  { label: "Data & privacy", href: "/dashboard/settings" },
+];
 
 function Segmented<T extends string>({
   value,
@@ -200,14 +202,15 @@ export function SettingsClient({ initial }: { initial: Initial }) {
         </h1>
         <nav className="flex flex-col gap-0.5">
           {SECTIONS.map((section, i) => (
-            <span
-              key={section}
+            <Link
+              key={section.label}
+              href={section.href}
               className={`text-body rounded-md px-2.5 py-[7px] ${
                 i === 0 ? "bg-secondary font-medium" : "text-muted-foreground"
               }`}
             >
-              {section}
-            </span>
+              {section.label}
+            </Link>
           ))}
         </nav>
       </div>
