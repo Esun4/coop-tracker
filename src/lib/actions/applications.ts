@@ -345,15 +345,72 @@ export async function getStats() {
   }
 
   const total = Object.values(byStatus).reduce((a, b) => a + b, 0);
-  const interviews =
-    (byStatus.INTERVIEW || 0) +
-    (byStatus.FINAL_ROUND || 0) +
-    (byStatus.OFFER || 0);
+  const closed = (byStatus.REJECTED || 0) + (byStatus.WITHDRAWN || 0);
+  const inPlay = total - closed;
+
+  // "Replied" means they came back to you at all — a rejection is a reply.
+  // Withdrawn is your move, not theirs, so it does not count either way.
+  const replied = total - (byStatus.APPLIED || 0) - (byStatus.WITHDRAWN || 0);
+
+  // Named on the metric strip, so a couple is enough.
+  const offerCompanies = await prisma.application.findMany({
+    where: { userId, archived: false, status: "OFFER" },
+    select: { company: true },
+    orderBy: { updatedAt: "desc" },
+    take: 3,
+  });
+
+  // Days from applying to the first time the status left APPLIED. Reads the
+  // activity ledger rather than updatedAt, which any edit would disturb, and
+  // ignores moves to WITHDRAWN — that is your move, not a reply from them.
+  const medianRows = await prisma.$queryRaw<{ median: number | null }[]>`
+    SELECT percentile_cont(0.5) WITHIN GROUP (
+             ORDER BY EXTRACT(EPOCH FROM (t.first_reply - t.applied_on)) / 86400
+           )::float AS median
+    FROM (
+      SELECT a.id, a."applicationDate" AS applied_on, MIN(l."createdAt") AS first_reply
+      FROM "Application" a
+      JOIN "ActivityLog" l ON l."applicationId" = a.id
+      WHERE a."userId" = ${userId}
+        AND a.archived = false
+        AND a."applicationDate" IS NOT NULL
+        AND l.action = 'updated'
+        AND l.details -> 'status' ->> 'from' = 'APPLIED'
+        AND l.details -> 'status' ->> 'to' <> 'WITHDRAWN'
+      GROUP BY a.id, a."applicationDate"
+    ) t
+    WHERE t.first_reply > t.applied_on
+  `;
+  const median = medianRows[0]?.median;
+
+  // "Reached interview" is furthest-ever, not currently-standing: an
+  // application that interviewed and was then rejected still reached it. The
+  // standing count would under-report every past interview.
+  const reachedRows = await prisma.$queryRaw<{ count: bigint }[]>`
+    SELECT COUNT(DISTINCT a.id)::bigint AS count
+    FROM "Application" a
+    LEFT JOIN "ActivityLog" l
+      ON l."applicationId" = a.id
+     AND l.action = 'updated'
+     AND l.details -> 'status' ->> 'to' IN ('INTERVIEW', 'FINAL_ROUND', 'OFFER')
+    WHERE a."userId" = ${userId}
+      AND a.archived = false
+      AND (a.status IN ('INTERVIEW', 'FINAL_ROUND', 'OFFER') OR l.id IS NOT NULL)
+  `;
+  const reachedInterview = Number(reachedRows[0]?.count ?? 0);
 
   return {
     total,
     byStatus,
-    interviewRate: total > 0 ? interviews / total : 0,
+    interviewRate: total > 0 ? reachedInterview / total : 0,
+    inPlay,
+    closed,
+    interviews: reachedInterview,
+    replied,
+    responseRate: total > 0 ? replied / total : 0,
+    offers: byStatus.OFFER || 0,
+    offerCompanies: offerCompanies.map((o) => o.company),
+    medianReplyDays: median == null ? null : Math.round(median),
   };
 }
 

@@ -1,8 +1,8 @@
 "use client";
 
-import { useState, useCallback, useEffect, useTransition } from "react";
-import { StatsCards } from "./stats-cards";
-import { ApplicationTable } from "./application-table";
+import { useState, useCallback, useEffect, useMemo, useTransition } from "react";
+import { MetricStrip } from "./metric-strip";
+import { ApplicationTable, type Density } from "./application-table";
 import { ApplicationForm } from "./application-form";
 import { FiltersToolbar } from "./filters-toolbar";
 import { ActivityFeed } from "./activity-feed";
@@ -24,7 +24,8 @@ import {
 import { getUnresolvedSuggestions } from "@/lib/actions/suggestions";
 import { syncGmailEmails } from "@/lib/actions/gmail";
 import type { Application, EmailSuggestion } from "@/generated/prisma/client";
-import { statusLabels } from "@/lib/schemas";
+import { statusLabels, type ApplicationStatusType } from "@/lib/schemas";
+import { isInPlay } from "@/lib/stage";
 import { toast } from "sonner";
 import {
   Plus,
@@ -37,24 +38,27 @@ import {
 
 interface DashboardData {
   applications: Application[];
-  stats: {
-    total: number;
-    byStatus: Record<string, number>;
-    interviewRate: number;
-  };
+  stats: Awaited<ReturnType<typeof getStats>>;
   activities: Awaited<ReturnType<typeof getRecentActivity>>;
   sources: string[];
   suggestions: EmailSuggestion[];
 }
+
+const PAGE_SIZE = 50;
 
 export function DashboardClient({ initial }: { initial: DashboardData }) {
   const [data, setData] = useState(initial);
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("");
   const [sourceFilter, setSourceFilter] = useState("");
-  const [showArchived, setShowArchived] = useState(false);
-  const [sortBy, setSortBy] = useState("updatedAt");
-  const [sortOrder, setSortOrder] = useState<"asc" | "desc">("desc");
+  // The redesigned toolbar has no archived view and no sort headers — rows are
+  // grouped by whose move it is, most recently touched first inside each group.
+  const showArchived = false;
+  const sortBy = "updatedAt";
+  const sortOrder = "desc" as const;
+  const [inPlayOnly, setInPlayOnly] = useState(true);
+  const [density, setDensity] = useState<Density>("compact");
+  const [page, setPage] = useState(1);
   const [showAddForm, setShowAddForm] = useState(false);
   const [isPending, startTransition] = useTransition();
   const [isSyncing, setIsSyncing] = useState(false);
@@ -87,13 +91,37 @@ export function DashboardClient({ initial }: { initial: DashboardData }) {
     refresh();
   }, [refresh]);
 
-  function handleSort(column: string) {
-    if (sortBy === column) {
-      setSortOrder(sortOrder === "asc" ? "desc" : "asc");
-    } else {
-      setSortBy(column);
-      setSortOrder("asc");
-    }
+  // The in-play filter is applied here rather than in the query so the closed
+  // count stays available for the collapsed row that explains the filter.
+  const rows = useMemo(
+    () =>
+      inPlayOnly
+        ? data.applications.filter((a) =>
+            isInPlay(a.status as ApplicationStatusType),
+          )
+        : data.applications,
+    [data.applications, inPlayOnly],
+  );
+
+  // Counted from the filtered set, not the global totals: the collapsed row
+  // claims these are hidden *by the in-play filter*, so it must not include
+  // closed rows that the search or source filter excluded anyway.
+  const closedCount = useMemo(
+    () => ({
+      rejected: data.applications.filter((a) => a.status === "REJECTED").length,
+      withdrawn: data.applications.filter((a) => a.status === "WITHDRAWN")
+        .length,
+    }),
+    [data.applications],
+  );
+
+  // Changing what is shown sends you back to page one. Done on the event
+  // rather than in an effect, which would cost a second render every time.
+  function withPageReset<T>(setter: (value: T) => void) {
+    return (value: T) => {
+      setter(value);
+      setPage(1);
+    };
   }
 
   function handleExport() {
@@ -228,7 +256,7 @@ export function DashboardClient({ initial }: { initial: DashboardData }) {
         </div>
       </div>
 
-      <StatsCards stats={data.stats} />
+      <MetricStrip stats={data.stats} />
 
       {data.suggestions.length > 0 && (
         <EmailSuggestionsSection
@@ -243,25 +271,29 @@ export function DashboardClient({ initial }: { initial: DashboardData }) {
         <div className="space-y-3">
           <FiltersToolbar
             search={search}
-            onSearchChange={setSearch}
+            onSearchChange={withPageReset(setSearch)}
             statusFilter={statusFilter}
-            onStatusFilterChange={setStatusFilter}
+            onStatusFilterChange={withPageReset(setStatusFilter)}
             sourceFilter={sourceFilter}
-            onSourceFilterChange={setSourceFilter}
+            onSourceFilterChange={withPageReset(setSourceFilter)}
             sources={data.sources}
-            showArchived={showArchived}
-            onShowArchivedChange={setShowArchived}
+            inPlayOnly={inPlayOnly}
+            onInPlayOnlyChange={withPageReset(setInPlayOnly)}
+            density={density}
+            onDensityChange={setDensity}
+            shown={rows.length}
+            total={data.stats.total}
           />
 
           <div className={isPending ? "opacity-50 pointer-events-none transition-opacity" : "transition-opacity"}>
             <ApplicationTable
-              applications={[
-                ...data.applications.filter((a) => a.status !== "REJECTED"),
-                ...data.applications.filter((a) => a.status === "REJECTED"),
-              ]}
-              sortBy={sortBy}
-              sortOrder={sortOrder}
-              onSort={handleSort}
+              applications={rows}
+              closedCount={closedCount}
+              showingClosed={!inPlayOnly}
+              density={density}
+              page={page}
+              pageSize={PAGE_SIZE}
+              onPageChange={setPage}
               onUpdate={refresh}
             />
           </div>
