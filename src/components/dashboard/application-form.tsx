@@ -20,6 +20,7 @@ import {
 } from "@/components/ui/dialog";
 import { applicationStatuses, statusLabels } from "@/lib/schemas";
 import { createApplication, updateApplication } from "@/lib/actions/applications";
+import { ChevronRight } from "lucide-react";
 import { toast } from "sonner";
 import type { Application } from "@/generated/prisma/client";
 
@@ -54,6 +55,8 @@ export function ApplicationForm({
 }: ApplicationFormProps) {
   const [loading, setLoading] = useState(false);
   const isEditing = !!application;
+  // Editing shows everything: the fields are already filled in.
+  const [showOptional, setShowOptional] = useState(isEditing);
 
   const [company, setCompany] = useState(application?.company ?? "");
   const [roleTitle, setRoleTitle] = useState(application?.roleTitle ?? "");
@@ -78,8 +81,20 @@ export function ApplicationForm({
     setContactInfo(application?.contactInfo ?? "");
   }, [application?.id]);
 
+  /** ⌘⏎ / Ctrl+⏎ saves and leaves the dialog open for the next one. */
+  function handleKeyDown(e: React.KeyboardEvent<HTMLFormElement>) {
+    if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) {
+      e.preventDefault();
+      void submit({ addAnother: !isEditing });
+    }
+  }
+
   async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
+    await submit({ addAnother: false });
+  }
+
+  async function submit({ addAnother }: { addAnother: boolean }) {
     setLoading(true);
 
     const data = {
@@ -105,23 +120,43 @@ export function ApplicationForm({
     }
 
     toast.success(isEditing ? "Application updated" : "Application added");
-    onOpenChange(false);
     onSuccess?.();
+
+    if (addAnother) {
+      // Stay open, cleared, ready for the next one.
+      setCompany("");
+      setRoleTitle("");
+      setLocation("");
+      setContactInfo("");
+      setNotes("");
+      return;
+    }
+
+    onOpenChange(false);
   }
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle>
-            {isEditing ? "Edit Application" : "Add Application"}
+          <DialogTitle className="text-[16.5px] font-semibold">
+            {isEditing ? "Edit application" : "Add an application"}
           </DialogTitle>
+          {!isEditing && (
+            <p className="text-meta text-muted-foreground mt-1">
+              Two fields is enough. The rest can wait until you hear back.
+            </p>
+          )}
         </DialogHeader>
 
-        <form onSubmit={handleSubmit} className="space-y-4">
+        <form
+          onSubmit={handleSubmit}
+          onKeyDown={handleKeyDown}
+          className="space-y-4"
+        >
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
-              <Label htmlFor="company">Company *</Label>
+              <Label htmlFor="company">Company</Label>
               <Input
                 id="company"
                 name="company"
@@ -132,7 +167,7 @@ export function ApplicationForm({
               />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="roleTitle">Role Title *</Label>
+              <Label htmlFor="roleTitle">Role</Label>
               <Input
                 id="roleTitle"
                 name="roleTitle"
@@ -146,7 +181,7 @@ export function ApplicationForm({
 
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
-              <Label htmlFor="status">Status</Label>
+              <Label htmlFor="status">Stage</Label>
               <Select
                 name="status"
                 value={status}
@@ -165,39 +200,7 @@ export function ApplicationForm({
               </Select>
             </div>
             <div className="space-y-2">
-              <Label htmlFor="source">Source</Label>
-              <Select
-                name="source"
-                value={source}
-                onValueChange={(v) => { if (v !== null) setSource(v); }}
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="Select source" />
-                </SelectTrigger>
-                <SelectContent>
-                  {commonSources.map((s) => (
-                    <SelectItem key={s} value={s}>
-                      {s}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-          </div>
-
-          <div className="grid grid-cols-2 gap-4">
-            <div className="space-y-2">
-              <Label htmlFor="location">Location</Label>
-              <Input
-                id="location"
-                name="location"
-                value={location}
-                onChange={(e) => setLocation(e.target.value)}
-                placeholder="e.g. San Francisco, CA"
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="applicationDate">Application Date</Label>
+              <Label htmlFor="applicationDate">Applied on</Label>
               <Input
                 id="applicationDate"
                 name="applicationDate"
@@ -208,30 +211,87 @@ export function ApplicationForm({
             </div>
           </div>
 
-          <div className="space-y-2">
-            <Label htmlFor="contactInfo">Contact / Recruiter</Label>
-            <Input
-              id="contactInfo"
-              name="contactInfo"
-              value={contactInfo}
-              onChange={(e) => setContactInfo(e.target.value)}
-              placeholder="e.g. Jane Doe - jane@company.com"
+          {/* Everything you can fill in later folds behind one row. */}
+          <button
+            type="button"
+            onClick={() => setShowOptional((v) => !v)}
+            className="border-border-subtle flex w-full items-center gap-2 border-t pt-4 text-left"
+          >
+            <ChevronRight
+              className={`text-muted-foreground size-3.5 transition-transform ${
+                showOptional ? "rotate-90" : ""
+              }`}
             />
-          </div>
+            <span className="text-body font-medium">
+              Location, source, contact, notes
+            </span>
+            <span className="text-meta text-muted-foreground">optional</span>
+          </button>
 
-          <div className="space-y-2">
-            <Label htmlFor="notes">Notes</Label>
-            <Textarea
-              id="notes"
-              name="notes"
-              value={notes}
-              onChange={(e) => setNotes(e.target.value)}
-              placeholder="Any notes about this application..."
-              rows={3}
-            />
-          </div>
+          {showOptional && (
+            <div className="space-y-4">
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="location">Location</Label>
+                  <Input
+                    id="location"
+                    name="location"
+                    value={location}
+                    onChange={(e) => setLocation(e.target.value)}
+                    placeholder="e.g. San Francisco, CA"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="source">Source</Label>
+                  <Select
+                    name="source"
+                    value={source}
+                    onValueChange={(v) => { if (v !== null) setSource(v); }}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select source" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {commonSources.map((s) => (
+                        <SelectItem key={s} value={s}>
+                          {s}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
 
-          <div className="flex justify-end gap-2 pt-2">
+              <div className="space-y-2">
+                <Label htmlFor="contactInfo">Contact / recruiter</Label>
+                <Input
+                  id="contactInfo"
+                  name="contactInfo"
+                  value={contactInfo}
+                  onChange={(e) => setContactInfo(e.target.value)}
+                  placeholder="e.g. Jane Doe — jane@company.com"
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="notes">Notes</Label>
+                <Textarea
+                  id="notes"
+                  name="notes"
+                  value={notes}
+                  onChange={(e) => setNotes(e.target.value)}
+                  placeholder="Any notes about this application…"
+                  rows={3}
+                />
+              </div>
+            </div>
+          )}
+
+          <div className="flex items-center justify-between gap-3 pt-2">
+            <span className="text-caption text-muted-foreground">
+              {isEditing ? "" : "⌘⏎ to save and add another"}
+            </span>
+            <div className="flex gap-2">
             <Button
               type="button"
               variant="outline"
@@ -242,12 +302,13 @@ export function ApplicationForm({
             <Button type="submit" disabled={loading}>
               {loading
                 ? isEditing
-                  ? "Saving..."
-                  : "Adding..."
+                  ? "Saving…"
+                  : "Adding…"
                 : isEditing
-                ? "Save Changes"
-                : "Add Application"}
+                  ? "Save changes"
+                  : "Add application"}
             </Button>
+            </div>
           </div>
         </form>
       </DialogContent>

@@ -7,6 +7,14 @@ import { ApplicationForm } from "./application-form";
 import { FiltersToolbar } from "./filters-toolbar";
 import { ActivityFeed } from "./activity-feed";
 import { EmailSuggestionsSection } from "./email-suggestions-section";
+import { SuggestionsCard } from "./suggestions-card";
+import { ReviewSuggestionsDialog } from "./review-suggestions-dialog";
+import { NothingFoundDialog } from "./nothing-found-dialog";
+import {
+  GmailExpiredBanner,
+  GmailExpiredDialog,
+  GmailExpiredPill,
+} from "./gmail-status";
 import { ImportCsvDialog } from "./import-csv-dialog";
 import { Button } from "@/components/ui/button";
 import {
@@ -21,7 +29,12 @@ import {
   getRecentActivity,
   getDistinctSources,
 } from "@/lib/actions/applications";
-import { getUnresolvedSuggestions } from "@/lib/actions/suggestions";
+import {
+  getUnresolvedSuggestions,
+  acceptAllSuggestions,
+  acceptStatusUpdate,
+  dismissSuggestion,
+} from "@/lib/actions/suggestions";
 import { syncGmailEmails } from "@/lib/actions/gmail";
 import type { Application, EmailSuggestion } from "@/generated/prisma/client";
 import { statusLabels, type ApplicationStatusType } from "@/lib/schemas";
@@ -63,6 +76,13 @@ export function DashboardClient({ initial }: { initial: DashboardData }) {
   const [isPending, startTransition] = useTransition();
   const [isSyncing, setIsSyncing] = useState(false);
   const [showImport, setShowImport] = useState(false);
+  const [gmailExpired, setGmailExpired] = useState(false);
+  const [showGmailDialog, setShowGmailDialog] = useState(false);
+  const [showNothingFound, setShowNothingFound] = useState(false);
+  const [lastScanned, setLastScanned] = useState(0);
+  const [showReview, setShowReview] = useState(false);
+  const [acceptingAll, setAcceptingAll] = useState(false);
+  const [showSuggestionDetail, setShowSuggestionDetail] = useState(false);
 
   const refresh = useCallback(() => {
     startTransition(async () => {
@@ -114,6 +134,68 @@ export function DashboardClient({ initial }: { initial: DashboardData }) {
     }),
     [data.applications],
   );
+
+  // Says which filter emptied the table, and how much sits behind it.
+  const filterSummary = useMemo(() => {
+    if (rows.length > 0) return null;
+    const clauses: string[] = [];
+    if (search) clauses.push(`“${search}”`);
+    if (statusFilter && statusFilter !== "all") {
+      clauses.push(statusLabels[statusFilter as ApplicationStatusType] ?? statusFilter);
+    }
+    if (sourceFilter && sourceFilter !== "all") clauses.push(sourceFilter);
+    if (inPlayOnly) clauses.push("in play");
+    if (clauses.length === 0) return null;
+    return { description: clauses.join(" · "), totalWithout: data.stats.total };
+  }, [rows.length, search, statusFilter, sourceFilter, inPlayOnly, data.stats.total]);
+
+  function clearFilters() {
+    setSearch("");
+    setStatusFilter("");
+    setSourceFilter("");
+    setInPlayOnly(true);
+    setPage(1);
+  }
+
+  async function handleAcceptSuggestion(
+    suggestion: EmailSuggestion,
+    application: Application,
+  ) {
+    if (!suggestion.suggestedStatus) return;
+    const result = await acceptStatusUpdate(
+      suggestion.id,
+      application.id,
+      suggestion.suggestedStatus,
+    );
+    if (result.error) {
+      toast.error(result.error);
+      return;
+    }
+    toast.success(`${application.company} updated`);
+    refresh();
+  }
+
+  async function handleDismissSuggestion(suggestion: EmailSuggestion) {
+    const result = await dismissSuggestion(suggestion.id);
+    if (result.error) {
+      toast.error(result.error);
+      return;
+    }
+    refresh();
+  }
+
+  async function handleAcceptAll() {
+    setAcceptingAll(true);
+    const result = await acceptAllSuggestions();
+    setAcceptingAll(false);
+    const { accepted, skipped } = result;
+    toast.success(
+      skipped > 0
+        ? `Accepted ${accepted} · ${skipped} needed a closer look`
+        : `Accepted ${accepted} suggestion${accepted === 1 ? "" : "s"}`,
+    );
+    refresh();
+  }
 
   // Changing what is shown sends you back to page one. Done on the event
   // rather than in an effect, which would cost a second render every time.
@@ -171,12 +253,23 @@ export function DashboardClient({ initial }: { initial: DashboardData }) {
     setIsSyncing(false);
 
     if (result.error) {
+      // An expired token is a state, not a one-off error: it earns a banner
+      // that persists, and a dialog because this scan was asked for.
+      if (result.code === "gmail_expired" || result.code === "gmail_disconnected") {
+        setGmailExpired(true);
+        setShowGmailDialog(true);
+        return;
+      }
       toast.error(result.error);
       return;
     }
 
+    setGmailExpired(false);
+
     if (result.newSuggestions === 0) {
-      toast.info("No new job-related emails found");
+      // The user asked for this scan, so it gets a full answer.
+      setLastScanned(result.scanned ?? 0);
+      setShowNothingFound(true);
     } else {
       toast.success(
         `Found ${result.newSuggestions} new suggestion${result.newSuggestions === 1 ? "" : "s"}`
@@ -200,6 +293,9 @@ export function DashboardClient({ initial }: { initial: DashboardData }) {
         </div>
 
         <div className="flex items-center gap-2">
+          {gmailExpired && (
+            <GmailExpiredPill onClick={() => setShowGmailDialog(true)} />
+          )}
           <Button
             variant="outline"
             size="sm"
@@ -258,11 +354,10 @@ export function DashboardClient({ initial }: { initial: DashboardData }) {
 
       <MetricStrip stats={data.stats} />
 
-      {data.suggestions.length > 0 && (
-        <EmailSuggestionsSection
-          suggestions={data.suggestions}
-          applications={data.applications}
-          onResolved={refresh}
+      {gmailExpired && (
+        <GmailExpiredBanner
+          lastSyncedAt={null}
+          onReconnect={() => setShowGmailDialog(true)}
         />
       )}
 
@@ -295,12 +390,26 @@ export function DashboardClient({ initial }: { initial: DashboardData }) {
               pageSize={PAGE_SIZE}
               onPageChange={setPage}
               onUpdate={refresh}
+              filterSummary={filterSummary}
+              onClearFilters={clearFilters}
             />
           </div>
         </div>
 
-        {/* Sidebar */}
-        <div className="lg:sticky lg:top-7 lg:self-start">
+        {/* Sidebar: what needs a decision, then what just happened. */}
+        <div className="space-y-4 lg:sticky lg:top-7 lg:self-start">
+          <SuggestionsCard
+            suggestions={data.suggestions}
+            onReview={() => {
+              if (gmailExpired) {
+                setShowGmailDialog(true);
+                return;
+              }
+              setShowReview(true);
+            }}
+            onAcceptAll={handleAcceptAll}
+            acceptingAll={acceptingAll}
+          />
           <ActivityFeed activities={data.activities} onResolved={refresh} />
         </div>
       </div>
@@ -317,6 +426,47 @@ export function DashboardClient({ initial }: { initial: DashboardData }) {
         open={showImport}
         onOpenChange={setShowImport}
         onSuccess={refresh}
+      />
+
+      <ReviewSuggestionsDialog
+        key={showReview ? "review-open" : "review-closed"}
+        open={showReview}
+        onOpenChange={setShowReview}
+        suggestions={data.suggestions}
+        applications={data.applications}
+        onAccept={handleAcceptSuggestion}
+        onDismiss={handleDismissSuggestion}
+        onAcceptAll={handleAcceptAll}
+        onNeedsReview={() => {
+          // Anything we cannot apply on its own hands off to the fuller flow.
+          setShowReview(false);
+          setShowSuggestionDetail(true);
+        }}
+      />
+
+      {showSuggestionDetail && data.suggestions.length > 0 && (
+        <EmailSuggestionsSection
+          suggestions={data.suggestions}
+          applications={data.applications}
+          onResolved={() => {
+            setShowSuggestionDetail(false);
+            refresh();
+          }}
+        />
+      )}
+
+      <GmailExpiredDialog
+        open={showGmailDialog}
+        onOpenChange={setShowGmailDialog}
+        lastSyncedAt={null}
+      />
+
+      <NothingFoundDialog
+        open={showNothingFound}
+        onOpenChange={setShowNothingFound}
+        scanned={lastScanned}
+        lastSyncedAt={null}
+        onAddManually={() => setShowAddForm(true)}
       />
     </div>
   );

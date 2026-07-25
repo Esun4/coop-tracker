@@ -33,6 +33,7 @@ import {
   deleteApplication,
   updateApplicationStatus,
 } from "@/lib/actions/applications";
+import { Button } from "@/components/ui/button";
 import { ApplicationForm } from "./application-form";
 import { toast } from "sonner";
 import type { Application } from "@/generated/prisma/client";
@@ -50,6 +51,9 @@ interface ApplicationTableProps {
   pageSize: number;
   onPageChange: (page: number) => void;
   onUpdate?: () => void;
+  /** Present only when a filter is what emptied the table. */
+  filterSummary?: { description: string; totalWithout: number | null } | null;
+  onClearFilters?: () => void;
 }
 
 const ROW_PAD: Record<Density, string> = {
@@ -131,6 +135,8 @@ export function ApplicationTable({
   pageSize,
   onPageChange,
   onUpdate,
+  filterSummary,
+  onClearFilters,
 }: ApplicationTableProps) {
   const [editApp, setEditApp] = useState<Application | null>(null);
 
@@ -156,6 +162,31 @@ export function ApplicationTable({
   }
 
   if (applications.length === 0) {
+    // An empty table caused by a filter is a different problem from an empty
+    // account: say which filter produced nothing, and how much is behind it.
+    if (filterSummary) {
+      return (
+        <div className="bg-card border-border rounded-xl border px-5 py-[26px] text-center">
+          <p className="text-body font-emphasis">
+            No applications match {filterSummary.description}
+          </p>
+          {filterSummary.totalWithout != null && (
+            <p className="text-meta text-muted-foreground mt-1.5">
+              You have {filterSummary.totalWithout} tracked without that filter.
+            </p>
+          )}
+          <Button
+            variant="outline"
+            size="sm"
+            className="mt-3.5"
+            onClick={onClearFilters}
+          >
+            Clear filters
+          </Button>
+        </div>
+      );
+    }
+
     return (
       <div className="bg-card border-border flex flex-col items-center rounded-xl border py-16 text-center">
         <div className="bg-secondary text-muted-foreground mb-3 flex size-10 items-center justify-center rounded-full">
