@@ -191,11 +191,11 @@ export function DashboardClient({ initial }: { initial: DashboardData }) {
       {/* Page header: title + primary actions */}
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div>
-          <h1 className="font-heading text-3xl font-semibold tracking-tight">
-            Dashboard
+          <h1 className="font-heading text-title tracking-title font-semibold">
+            Applications
           </h1>
-          <p className="mt-1 text-sm text-muted-foreground">
-            Track your co-op and internship applications in one place.
+          <p className="text-body text-muted-foreground mt-1.5">
+            {data.stats.total} tracked · {data.stats.inPlay} in play
           </p>
         </div>
 

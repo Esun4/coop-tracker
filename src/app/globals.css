@@ -324,6 +324,28 @@
   }
 }
 
+@keyframes skeleton-appear {
+  to {
+    opacity: 1;
+  }
+}
+
+/* Held back ~200ms: under that the cached case just renders, and a
+   skeleton that shows for three frames reads as a glitch. Both
+   animations are delayed, so the container starts invisible. */
+.skeleton-screen {
+  opacity: 0;
+  animation:
+    skeleton-appear 0s linear 200ms forwards,
+    skeleton-pulse 1.5s ease-in-out 200ms infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .skeleton-screen {
+    animation: skeleton-appear 0s linear 200ms forwards;
+  }
+}
+
 /* ── Table row hover ────────────────────────────────────────── */
 .ledger-row {
   transition: background-color var(--default-transition-duration) ease-out;
