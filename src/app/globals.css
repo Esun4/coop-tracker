@@ -4,120 +4,269 @@
 
 @custom-variant dark (&:is(.dark *));
 
+/* ── Token registration ──────────────────────────────────────────
+   Every value below resolves to a CSS custom property defined in
+   :root / .dark, so a single token edit restyles every primitive. */
 @theme inline {
+  /* Surfaces and ink */
   --color-background: var(--background);
   --color-foreground: var(--foreground);
+  --color-foreground-2: var(--foreground-2);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-sunken: var(--sunken);
+  --color-row-hover: var(--row-hover);
+
+  /* Lines */
+  --color-border: var(--border);
+  --color-border-subtle: var(--border-subtle);
+  --color-border-dash: var(--border-dash);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+
+  /* Brand + intent */
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-attn: var(--attn);
+  --color-attn-border: var(--attn-border);
+  --color-warn: var(--warn);
+  --color-warn-border: var(--warn-border);
+  --color-warn-foreground: var(--warn-foreground);
+  --color-destructive: var(--destructive);
+  --color-highlight: var(--highlight);
+
+  /* Monogram — neutral, never hashed to a hue */
+  --color-monogram: var(--monogram);
+  --color-monogram-foreground: var(--monogram-foreground);
+
+  /* Stage ramp — one hue, intensity = pipeline depth.
+     Used by the tick meter, the metric strip bar and every chart. */
+  --color-stage-1: var(--stage-1);
+  --color-stage-2: var(--stage-2);
+  --color-stage-3: var(--stage-3);
+  --color-stage-4: var(--stage-4);
+  --color-stage-5: var(--stage-5);
+  --color-stage-off: var(--stage-off);
+
+  /* Chip surfaces derived from the ramp (bg / border / text) */
+  --color-chip-1: var(--chip-1);
+  --color-chip-1-border: var(--chip-1-border);
+  --color-chip-1-foreground: var(--chip-1-foreground);
+  --color-chip-2: var(--chip-2);
+  --color-chip-2-border: var(--chip-2-border);
+  --color-chip-2-foreground: var(--chip-2-foreground);
+  --color-chip-3: var(--chip-3);
+  --color-chip-3-border: var(--chip-3-border);
+  --color-chip-3-foreground: var(--chip-3-foreground);
+  --color-chip-4: var(--chip-4);
+  --color-chip-4-border: var(--chip-4-border);
+  --color-chip-4-foreground: var(--chip-4-foreground);
+  --color-chip-5: var(--chip-5);
+  --color-chip-5-border: var(--chip-5-border);
+  --color-chip-5-foreground: var(--chip-5-foreground);
+  /* Terminal states drop out of colour entirely */
+  --color-chip-closed-border: var(--chip-closed-border);
+  --color-chip-closed-foreground: var(--chip-closed-foreground);
+
+  /* Charts share the ramp — never a per-category palette */
+  --color-chart-1: var(--stage-1);
+  --color-chart-2: var(--stage-2);
+  --color-chart-3: var(--stage-3);
+  --color-chart-4: var(--stage-4);
+  --color-chart-5: var(--stage-5);
+
+  /* Type */
   --font-sans: var(--font-dm-sans);
   --font-mono: var(--font-jetbrains-mono);
   --font-heading: var(--font-playfair);
-  --color-sidebar-ring: var(--sidebar-ring);
-  --color-sidebar-border: var(--sidebar-border);
-  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
-  --color-sidebar-accent: var(--sidebar-accent);
-  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
-  --color-sidebar-primary: var(--sidebar-primary);
-  --color-sidebar-foreground: var(--sidebar-foreground);
-  --color-sidebar: var(--sidebar);
-  --color-chart-5: var(--chart-5);
-  --color-chart-4: var(--chart-4);
-  --color-chart-3: var(--chart-3);
-  --color-chart-2: var(--chart-2);
-  --color-chart-1: var(--chart-1);
-  --color-ring: var(--ring);
-  --color-input: var(--input);
-  --color-border: var(--border);
-  --color-destructive: var(--destructive);
-  --color-accent-foreground: var(--accent-foreground);
-  --color-accent: var(--accent);
-  --color-muted-foreground: var(--muted-foreground);
-  --color-muted: var(--muted);
-  --color-secondary-foreground: var(--secondary-foreground);
-  --color-secondary: var(--secondary);
-  --color-primary-foreground: var(--primary-foreground);
-  --color-primary: var(--primary);
-  --color-popover-foreground: var(--popover-foreground);
-  --color-popover: var(--popover);
-  --color-card-foreground: var(--card-foreground);
-  --color-card: var(--card);
-  --radius-sm: calc(var(--radius) * 0.6);
-  --radius-md: calc(var(--radius) * 0.8);
-  --radius-lg: var(--radius);
-  --radius-xl: calc(var(--radius) * 1.4);
-  --radius-2xl: calc(var(--radius) * 1.8);
-  --radius-3xl: calc(var(--radius) * 2.2);
-  --radius-4xl: calc(var(--radius) * 2.6);
+
+  --font-weight-emphasis: 550;
+
+  --text-label: 11px;
+  --text-label--line-height: 1.4;
+  --text-micro: 11.5px;
+  --text-micro--line-height: 1.45;
+  --text-caption: 12px;
+  --text-caption--line-height: 1.5;
+  --text-meta: 12.5px;
+  --text-meta--line-height: 1.5;
+  --text-body: 13.5px;
+  --text-body--line-height: 1.55;
+  --text-lede: 14.5px;
+  --text-lede--line-height: 1.5;
+  --text-title: 26px;
+  --text-title--line-height: 1.15;
+  --text-metric: 40px;
+  --text-metric--line-height: 1;
+
+  --tracking-label: 0.12em;
+  --tracking-column: 0.1em;
+  --tracking-title: -0.02em;
+  --tracking-wordmark: -0.015em;
+  --tracking-metric: -0.03em;
+
+  /* Geometry — 6 chips · 8 toggles · 9 inputs+buttons · 11 inline
+     cards · 12 cards · 14 dialogs · full pills */
+  --radius-sm: 6px;
+  --radius-md: 8px;
+  --radius-lg: 9px;
+  --radius-inline: 11px;
+  --radius-xl: 12px;
+  --radius-2xl: 14px;
+  --radius-3xl: 18px;
+  --radius-4xl: 24px;
+
+  /* Shadows only on things that float. Cards use borders. */
+  --shadow-dialog: 0 18px 40px -20px var(--shadow-color);
+  --shadow-toast: 0 12px 28px -18px var(--shadow-color);
+
+  /* The skeleton breath is the only looping animation in the app */
+  --animate-skeleton: skeleton-pulse 1.5s ease-in-out infinite;
+
+  /* Hover/press only, 120–160ms */
+  --default-transition-duration: 140ms;
+  --default-transition-timing-function: cubic-bezier(0, 0, 0.2, 1);
 }
 
-/* ── Theme: "editorial ledger" ──────────────────────────────────
-   Warm paper background, warm ink text, deep racing-green primary.
-   Pairs with the Playfair serif headings for a print-ledger feel. */
+/* ── Theme: "editorial ledger", light ────────────────────────────
+   Warm paper, warm ink, one deep racing-green ramp. No page wash. */
 :root {
-  --background: oklch(0.972 0.007 85);
-  --foreground: oklch(0.225 0.015 60);
-  --card: oklch(0.993 0.003 85);
-  --card-foreground: oklch(0.225 0.015 60);
-  --popover: oklch(0.993 0.003 85);
-  --popover-foreground: oklch(0.225 0.015 60);
-  --primary: oklch(0.42 0.075 165);
+  --background: oklch(0.975 0.005 85);
+  --foreground: oklch(0.22 0.012 60);
+  --foreground-2: oklch(0.34 0.012 65);
+  --card: oklch(0.996 0.002 85);
+  --card-foreground: oklch(0.22 0.012 60);
+  --popover: oklch(0.996 0.002 85);
+  --popover-foreground: oklch(0.22 0.012 60);
+  --muted: oklch(0.945 0.006 85);
+  --muted-foreground: oklch(0.5 0.012 70);
+  --secondary: oklch(0.945 0.006 85);
+  --secondary-foreground: oklch(0.22 0.012 60);
+  --accent: oklch(0.945 0.006 85);
+  --accent-foreground: oklch(0.22 0.012 60);
+  --sunken: oklch(0.968 0.004 85);
+  --row-hover: oklch(0.968 0.005 85);
+
+  --border: oklch(0.9 0.008 80);
+  --border-subtle: oklch(0.93 0.006 80);
+  --border-dash: oklch(0.88 0.008 80);
+  --input: oklch(0.9 0.008 80);
+  --ring: oklch(0.78 0.05 165);
+
+  --primary: oklch(0.4 0.055 165);
   --primary-foreground: oklch(0.98 0.008 90);
-  --secondary: oklch(0.938 0.012 85);
-  --secondary-foreground: oklch(0.28 0.02 60);
-  --muted: oklch(0.945 0.01 85);
-  --muted-foreground: oklch(0.5 0.02 70);
-  --accent: oklch(0.935 0.018 155);
-  --accent-foreground: oklch(0.3 0.05 160);
-  --destructive: oklch(0.577 0.245 27.325);
-  --border: oklch(0.885 0.012 80);
-  --input: oklch(0.885 0.012 80);
-  --ring: oklch(0.55 0.08 165);
-  --chart-1: oklch(0.55 0.13 160);
-  --chart-2: oklch(0.55 0.15 275);
-  --chart-3: oklch(0.55 0.18 300);
-  --chart-4: oklch(0.72 0.13 80);
-  --chart-5: oklch(0.58 0.19 27);
+  --attn: oklch(0.972 0.012 165);
+  --attn-border: oklch(0.895 0.02 165);
+  --warn: oklch(0.975 0.022 40);
+  --warn-border: oklch(0.88 0.045 45);
+  --warn-foreground: oklch(0.5 0.13 40);
+  --destructive: oklch(0.5 0.13 40);
+  --highlight: oklch(0.93 0.03 165);
+
+  --monogram: oklch(0.945 0.006 85);
+  --monogram-foreground: oklch(0.45 0.012 70);
+
+  --stage-1: oklch(0.9 0.014 165);
+  --stage-2: oklch(0.8 0.04 165);
+  --stage-3: oklch(0.64 0.06 165);
+  --stage-4: oklch(0.5 0.06 165);
+  --stage-5: oklch(0.4 0.055 165);
+  --stage-off: oklch(0.925 0.004 85);
+
+  --chip-1: transparent;
+  --chip-1-border: oklch(0.895 0.008 80);
+  --chip-1-foreground: oklch(0.46 0.012 70);
+  --chip-2: oklch(0.955 0.022 165);
+  --chip-2-border: oklch(0.9 0.03 165);
+  --chip-2-foreground: oklch(0.38 0.05 165);
+  --chip-3: oklch(0.928 0.035 165);
+  --chip-3-border: oklch(0.87 0.045 165);
+  --chip-3-foreground: oklch(0.33 0.055 165);
+  --chip-4: oklch(0.895 0.05 165);
+  --chip-4-border: oklch(0.83 0.06 165);
+  --chip-4-foreground: oklch(0.28 0.06 165);
+  --chip-5: oklch(0.4 0.055 165);
+  --chip-5-border: transparent;
+  --chip-5-foreground: oklch(0.98 0.008 90);
+  --chip-closed-border: oklch(0.915 0.005 80);
+  --chip-closed-foreground: oklch(0.5 0.012 70);
+
+  --shadow-color: oklch(0.3 0.02 70 / 0.35);
   --radius: 0.75rem;
-  --sidebar: oklch(0.993 0.003 85);
-  --sidebar-foreground: oklch(0.225 0.015 60);
-  --sidebar-primary: oklch(0.42 0.075 165);
-  --sidebar-primary-foreground: oklch(0.98 0.008 90);
-  --sidebar-accent: oklch(0.945 0.01 85);
-  --sidebar-accent-foreground: oklch(0.28 0.02 60);
-  --sidebar-border: oklch(0.885 0.012 80);
-  --sidebar-ring: oklch(0.55 0.08 165);
 }
 
+/* ── Dark. Not an inversion: the ramp is rebuilt at dark-surface
+   lightness so all five steps stay apart, primary dialled back. */
 .dark {
-  --background: oklch(0.165 0.008 75);
-  --foreground: oklch(0.93 0.01 85);
-  --card: oklch(0.205 0.01 75);
-  --card-foreground: oklch(0.93 0.01 85);
-  --popover: oklch(0.205 0.01 75);
-  --popover-foreground: oklch(0.93 0.01 85);
-  --primary: oklch(0.78 0.1 160);
-  --primary-foreground: oklch(0.2 0.04 160);
-  --secondary: oklch(0.26 0.012 75);
-  --secondary-foreground: oklch(0.93 0.01 85);
-  --muted: oklch(0.26 0.012 75);
-  --muted-foreground: oklch(0.7 0.015 80);
-  --accent: oklch(0.28 0.022 160);
-  --accent-foreground: oklch(0.9 0.035 160);
-  --destructive: oklch(0.704 0.191 22.216);
-  --border: oklch(1 0 0 / 11%);
-  --input: oklch(1 0 0 / 14%);
-  --ring: oklch(0.6 0.09 160);
-  --chart-1: oklch(0.7 0.13 160);
-  --chart-2: oklch(0.65 0.15 275);
-  --chart-3: oklch(0.68 0.16 300);
-  --chart-4: oklch(0.78 0.13 80);
-  --chart-5: oklch(0.68 0.17 25);
-  --sidebar: oklch(0.205 0.01 75);
-  --sidebar-foreground: oklch(0.93 0.01 85);
-  --sidebar-primary: oklch(0.78 0.1 160);
-  --sidebar-primary-foreground: oklch(0.2 0.04 160);
-  --sidebar-accent: oklch(0.26 0.012 75);
-  --sidebar-accent-foreground: oklch(0.93 0.01 85);
-  --sidebar-border: oklch(1 0 0 / 11%);
-  --sidebar-ring: oklch(0.6 0.09 160);
+  --background: oklch(0.176 0.006 75);
+  --foreground: oklch(0.925 0.008 85);
+  --foreground-2: oklch(0.845 0.008 82);
+  --card: oklch(0.214 0.007 75);
+  --card-foreground: oklch(0.925 0.008 85);
+  --popover: oklch(0.214 0.007 75);
+  --popover-foreground: oklch(0.925 0.008 85);
+  --muted: oklch(0.262 0.008 75);
+  --muted-foreground: oklch(0.665 0.012 80);
+  --secondary: oklch(0.262 0.008 75);
+  --secondary-foreground: oklch(0.925 0.008 85);
+  --accent: oklch(0.262 0.008 75);
+  --accent-foreground: oklch(0.925 0.008 85);
+  --sunken: oklch(0.232 0.007 75);
+  --row-hover: oklch(0.238 0.008 75);
+
+  --border: oklch(1 0 0 / 0.105);
+  --border-subtle: oklch(1 0 0 / 0.07);
+  --border-dash: oklch(1 0 0 / 0.18);
+  --input: oklch(1 0 0 / 0.14);
+  --ring: oklch(0.5 0.055 165);
+
+  --primary: oklch(0.7 0.075 163);
+  --primary-foreground: oklch(0.16 0.03 163);
+  --attn: oklch(0.235 0.018 165);
+  --attn-border: oklch(0.32 0.03 165);
+  --warn: oklch(0.245 0.035 45);
+  --warn-border: oklch(0.36 0.06 45);
+  --warn-foreground: oklch(0.8 0.1 60);
+  --destructive: oklch(0.8 0.1 60);
+  --highlight: oklch(0.33 0.045 165);
+
+  --monogram: oklch(0.27 0.008 75);
+  --monogram-foreground: oklch(0.72 0.012 80);
+
+  --stage-1: oklch(0.34 0.02 165);
+  --stage-2: oklch(0.46 0.04 165);
+  --stage-3: oklch(0.56 0.055 165);
+  --stage-4: oklch(0.64 0.065 163);
+  --stage-5: oklch(0.72 0.075 163);
+  --stage-off: oklch(1 0 0 / 0.09);
+
+  --chip-1: transparent;
+  --chip-1-border: oklch(1 0 0 / 0.14);
+  --chip-1-foreground: oklch(0.7 0.012 80);
+  --chip-2: oklch(0.28 0.025 165);
+  --chip-2-border: oklch(0.35 0.03 165);
+  --chip-2-foreground: oklch(0.8 0.055 165);
+  --chip-3: oklch(0.32 0.04 165);
+  --chip-3-border: oklch(0.39 0.045 165);
+  --chip-3-foreground: oklch(0.86 0.065 165);
+  --chip-4: oklch(0.37 0.055 165);
+  --chip-4-border: oklch(0.44 0.06 165);
+  --chip-4-foreground: oklch(0.91 0.075 165);
+  --chip-5: oklch(0.7 0.075 163);
+  --chip-5-border: transparent;
+  --chip-5-foreground: oklch(0.16 0.03 163);
+  --chip-closed-border: oklch(1 0 0 / 0.1);
+  --chip-closed-foreground: oklch(0.665 0.012 80);
+
+  --shadow-color: oklch(0.1 0.01 70 / 0.6);
 }
 
 /* ── Base layer ─────────────────────────────────────────────── */
@@ -127,26 +276,14 @@
   }
   body {
     @apply bg-background text-foreground;
-    /* Faint green wash bleeding in from the top of the page */
-    background-image: radial-gradient(
-      70rem 22rem at 50% -8rem,
-      oklch(0.55 0.09 165 / 0.07),
-      transparent
-    );
-    background-repeat: no-repeat;
-  }
-  .dark body {
-    background-image: radial-gradient(
-      70rem 22rem at 50% -8rem,
-      oklch(0.75 0.1 160 / 0.06),
-      transparent
-    );
+    /* Everything numeric aligns — this is a ledger */
+    font-variant-numeric: tabular-nums;
   }
   html {
     @apply font-sans antialiased;
   }
   ::selection {
-    background: oklch(0.55 0.1 160 / 0.25);
+    background: var(--highlight);
   }
 }
 
@@ -167,76 +304,30 @@
   background: transparent;
 }
 ::-webkit-scrollbar-thumb {
-  background: oklch(0.85 0.012 80);
+  background: var(--border);
   border-radius: 3px;
 }
 ::-webkit-scrollbar-thumb:hover {
-  background: oklch(0.75 0.015 80);
-}
-.dark ::-webkit-scrollbar-thumb {
-  background: oklch(0.35 0.01 75);
-}
-.dark ::-webkit-scrollbar-thumb:hover {
-  background: oklch(0.45 0.01 75);
+  background: var(--muted-foreground);
 }
 
-/* ── Fade-in animation ──────────────────────────────────────── */
-@keyframes fade-up {
-  from {
-    opacity: 0;
-    transform: translateY(8px);
-  }
-  to {
+/* ── Skeleton breath ────────────────────────────────────────────
+   One pulse for the whole screen — applied to the container, never
+   per box. No travelling shimmer. */
+@keyframes skeleton-pulse {
+  0%,
+  100% {
     opacity: 1;
-    transform: translateY(0);
+  }
+  50% {
+    opacity: 0.5;
   }
 }
 
-.animate-fade-up {
-  animation: fade-up 0.4s ease forwards;
-}
-
-/* ── Table row hover effect ─────────────────────────────────── */
+/* ── Table row hover ────────────────────────────────────────── */
 .ledger-row {
-  position: relative;
-  transition: background-color 0.15s ease;
+  transition: background-color var(--default-transition-duration) ease-out;
 }
 .ledger-row:hover {
-  background-color: oklch(0.962 0.01 85);
+  background-color: var(--row-hover);
 }
-.dark .ledger-row:hover {
-  background-color: oklch(0.24 0.012 75);
-}
-.ledger-row::before {
-  content: '';
-  position: absolute;
-  left: 0;
-  top: 0;
-  bottom: 0;
-  width: 2px;
-  background: var(--primary);
-  opacity: 0;
-  transition: opacity 0.15s ease;
-}
-.ledger-row:hover::before {
-  opacity: 1;
-}
-
-/* ── Status badge styles ────────────────────────────────────── */
-/* One hue per status, used by badges, stat cards, and charts.
-   APPLIED is indigo to match the "Pending" slice in the charts. */
-.status-APPLIED     { background: rgba( 99, 102, 241, 0.08); color: #4338CA; border: 1px solid rgba( 99, 102, 241, 0.2); }
-.status-OA          { background: rgba(217, 119,   6, 0.08); color: #B45309; border: 1px solid rgba(217, 119,   6, 0.2); }
-.status-INTERVIEW   { background: rgba(126,  34, 206, 0.08); color: #6D28D9; border: 1px solid rgba(126,  34, 206, 0.2); }
-.status-FINAL_ROUND { background: rgba(194,  65,  12, 0.08); color: #C2410C; border: 1px solid rgba(194,  65,  12, 0.2); }
-.status-OFFER       { background: rgba(  5, 150, 105, 0.08); color: #065F46; border: 1px solid rgba(  5, 150, 105, 0.2); }
-.status-REJECTED    { background: rgba(185,  28,  28, 0.06); color: #B91C1C; border: 1px solid rgba(185,  28,  28, 0.15); }
-.status-WITHDRAWN   { background: rgba( 75,  85,  99, 0.08); color: #374151; border: 1px solid rgba( 75,  85,  99, 0.2); }
-
-.dark .status-APPLIED     { background: rgba( 99, 102, 241, 0.15); color: #A5B4FC; border-color: rgba( 99, 102, 241, 0.35); }
-.dark .status-OA          { background: rgba(217, 119,   6, 0.15); color: #FCD34D; border-color: rgba(217, 119,   6, 0.35); }
-.dark .status-INTERVIEW   { background: rgba(147,  51, 234, 0.15); color: #C4B5FD; border-color: rgba(147,  51, 234, 0.35); }
-.dark .status-FINAL_ROUND { background: rgba(234,  88,  12, 0.15); color: #FDBA74; border-color: rgba(234,  88,  12, 0.35); }
-.dark .status-OFFER       { background: rgba( 16, 185, 129, 0.15); color: #6EE7B7; border-color: rgba( 16, 185, 129, 0.35); }
-.dark .status-REJECTED    { background: rgba(239,  68,  68, 0.12); color: #FCA5A5; border-color: rgba(239,  68,  68, 0.3);  }
-.dark .status-WITHDRAWN   { background: rgba(156, 163, 175, 0.12); color: #D1D5DB; border-color: rgba(156, 163, 175, 0.3);  }
