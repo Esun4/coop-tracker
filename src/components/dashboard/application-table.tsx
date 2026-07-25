@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import Link from "next/link";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -35,6 +36,7 @@ import {
 import { ApplicationForm } from "./application-form";
 import { toast } from "sonner";
 import type { Application } from "@/generated/prisma/client";
+import { TABLE_COLS, TABLE_HEADINGS } from "./table-layout";
 
 export type Density = "compact" | "comfortable";
 
@@ -49,9 +51,6 @@ interface ApplicationTableProps {
   onPageChange: (page: number) => void;
   onUpdate?: () => void;
 }
-
-const COLS =
-  "grid-cols-[1.5fr_190px_100px_130px_120px_34px] grid px-[18px]";
 
 const ROW_PAD: Record<Density, string> = {
   compact: "py-[11px]",
@@ -200,8 +199,8 @@ export function ApplicationTable({
     <>
       <div className="bg-card border-border overflow-hidden rounded-xl border">
         {/* Column headers are chrome: they paint before any data arrives. */}
-        <div className={`${COLS} bg-sunken border-border border-b py-[9px]`}>
-          {["Company & role", "Stage", "Last update", "Location", "Source"].map(
+        <div className={`${TABLE_COLS} bg-sunken border-border border-b py-[9px]`}>
+          {TABLE_HEADINGS.map(
             (label) => (
               <span
                 key={label}
@@ -232,16 +231,19 @@ export function ApplicationTable({
             {rows.map((app) => (
               <div
                 key={app.id}
-                className={`ledger-row ${COLS} border-border-subtle items-center border-b ${ROW_PAD[density]} ${
+                className={`ledger-row ${TABLE_COLS} border-border-subtle items-center border-b ${ROW_PAD[density]} ${
                   app.archived ? "opacity-50" : ""
                 }`}
               >
                 <span className="flex min-w-0 items-center gap-[11px] pr-3">
                   <Monogram name={app.company} />
                   <span className="min-w-0">
-                    <span className="text-body font-emphasis block truncate">
+                    <Link
+                      href={`/dashboard/applications/${app.id}`}
+                      className="text-body font-emphasis block truncate hover:underline"
+                    >
                       {app.company}
-                    </span>
+                    </Link>
                     <span className="text-caption text-muted-foreground mt-px block truncate">
                       {app.roleTitle}
                     </span>

@@ -88,6 +88,127 @@ export async function getApplication(id: string) {
   });
 }
 
+/**
+ * Everything the detail view needs in one round trip: the record, its full
+ * history, where it sits in the in-play set, and the neighbours either side so
+ * the whole cycle can be walked without returning to the table.
+ */
+export async function getApplicationDetail(id: string) {
+  const userId = await getAuthUserId();
+
+  const application = await prisma.application.findFirst({
+    where: { id, userId },
+    include: { activityLogs: { orderBy: { createdAt: "desc" } } },
+  });
+  if (!application) return null;
+
+  // The same ordering the dashboard uses, so prev/next matches what you saw.
+  const inPlay = await prisma.application.findMany({
+    where: {
+      userId,
+      archived: false,
+      status: { notIn: [ApplicationStatus.REJECTED, ApplicationStatus.WITHDRAWN] },
+    },
+    select: { id: true },
+    orderBy: { updatedAt: "desc" },
+  });
+
+  const index = inPlay.findIndex((a) => a.id === id);
+
+  return {
+    application,
+    position: index >= 0 ? index + 1 : null,
+    total: inPlay.length,
+    prevId: index > 0 ? inPlay[index - 1].id : null,
+    nextId:
+      index >= 0 && index < inPlay.length - 1 ? inPlay[index + 1].id : null,
+  };
+}
+
+/**
+ * Median days spent before each transition, across this user's own history.
+ * Feeds the "typically 6d after" hint on the stage ahead — a hint drawn from
+ * their cycle rather than an invented benchmark.
+ */
+export async function getStageIntervals(): Promise<Record<string, number>> {
+  const userId = await getAuthUserId();
+
+  const rows = await prisma.$queryRaw<{ to_status: string; median: number }[]>`
+    SELECT t.to_status,
+           percentile_cont(0.5) WITHIN GROUP (
+             ORDER BY EXTRACT(EPOCH FROM (t.moved_at - t.applied_on)) / 86400
+           )::float AS median
+    FROM (
+      SELECT l.details -> 'status' ->> 'to' AS to_status,
+             MIN(l."createdAt") AS moved_at,
+             a."applicationDate" AS applied_on
+      FROM "Application" a
+      JOIN "ActivityLog" l ON l."applicationId" = a.id
+      WHERE a."userId" = ${userId}
+        AND a."applicationDate" IS NOT NULL
+        AND l.action = 'updated'
+        AND l.details -> 'status' ->> 'to' IS NOT NULL
+      GROUP BY a.id, l.details -> 'status' ->> 'to', a."applicationDate"
+    ) t
+    WHERE t.moved_at > t.applied_on
+    GROUP BY t.to_status
+  `;
+
+  const out: Record<string, number> = {};
+  for (const row of rows) {
+    if (row.median != null) out[row.to_status] = Math.round(row.median);
+  }
+  return out;
+}
+
+/**
+ * Set or clear the date an application is working towards. Clearing is a
+ * first-class option — a date read out of an email can simply be wrong.
+ */
+export async function setApplicationDeadline(
+  id: string,
+  input: { deadlineAt: string | null; note?: string | null },
+) {
+  const userId = await getAuthUserId();
+
+  const existing = await prisma.application.findFirst({
+    where: { id, userId },
+    select: { id: true },
+  });
+  if (!existing) return { error: "Application not found" };
+
+  let deadlineAt: Date | null = null;
+  if (input.deadlineAt) {
+    const parsed = new Date(input.deadlineAt);
+    if (Number.isNaN(parsed.getTime())) return { error: "That date isn't valid" };
+    deadlineAt = parsed;
+  }
+
+  await prisma.application.update({
+    where: { id },
+    data: {
+      deadlineAt,
+      // Editing by hand takes ownership of the date away from the classifier.
+      deadlineSource: deadlineAt ? "manual" : null,
+      deadlineNote: deadlineAt ? (input.note ?? null) : null,
+    },
+  });
+
+  await prisma.activityLog.create({
+    data: {
+      userId,
+      applicationId: id,
+      action: "updated",
+      details: { deadline: deadlineAt ? deadlineAt.toISOString() : null },
+      source: ActivitySource.manual,
+    },
+  });
+
+  revalidatePath(`/dashboard/applications/${id}`);
+  revalidatePath("/dashboard");
+  return { success: true };
+}
+
 export async function createApplication(data: unknown) {
   const userId = await getAuthUserId();
 

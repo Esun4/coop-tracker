@@ -98,6 +98,14 @@ model Application {
   contactInfo     String?
   archived        Boolean           @default(false)
 
+  // A date the application is working towards — an assessment due, an offer to
+  // decide on. `deadlineSource` records whether a human typed it or the
+  // classifier read it out of an email; `deadlineNote` keeps the sentence it
+  // came from, so a wrong date is traceable to its source.
+  deadlineAt     DateTime?
+  deadlineSource String?
+  deadlineNote   String?
+
   user         User          @relation(fields: [userId], references: [id], onDelete: Cascade)
   activityLogs ActivityLog[]
 

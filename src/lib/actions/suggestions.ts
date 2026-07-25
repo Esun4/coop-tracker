@@ -176,7 +176,16 @@ export async function acceptAllSuggestions() {
             userId,
             applicationId: match.id,
             action: "updated",
-            details: { status: { from: match.status, to: suggestion.suggestedStatus } },
+            details: {
+              status: { from: match.status, to: suggestion.suggestedStatus },
+              // Kept so the detail view can quote what the change was read
+              // from — a stage nobody can trace is a stage nobody can correct.
+              email: {
+                sender: suggestion.emailSender,
+                snippet: suggestion.emailSnippet,
+                date: suggestion.emailDate.toISOString(),
+              },
+            },
             source: ActivitySource.email_suggestion,
           },
         });
@@ -242,7 +251,14 @@ export async function acceptStatusUpdate(
       userId,
       applicationId,
       action: "updated",
-      details: { status: { from: existing.status, to: newStatus } },
+      details: {
+        status: { from: existing.status, to: newStatus },
+        email: {
+          sender: suggestion.emailSender,
+          snippet: suggestion.emailSnippet,
+          date: suggestion.emailDate.toISOString(),
+        },
+      },
       source: ActivitySource.email_suggestion,
     },
   });
