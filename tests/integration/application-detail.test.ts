@@ -23,6 +23,19 @@ async function makeApp(userId: string, company: string, status = "APPLIED") {
   });
 }
 
+/**
+ * Force a distinct updatedAt. Rows created back to back can land on the same
+ * millisecond, and prev/next is ordered by updatedAt — so without this the
+ * expected order is a coin flip.
+ */
+async function touchedAt(id: string, minutesAgo: number) {
+  await prisma.$executeRaw`
+    UPDATE "Application"
+    SET "updatedAt" = NOW() - (${minutesAgo} * INTERVAL '1 minute')
+    WHERE id = ${id}
+  `;
+}
+
 beforeAll(async () => {
   await prisma.$queryRaw`SELECT 1`;
 });
@@ -37,10 +50,13 @@ describe("getApplicationDetail", () => {
     const user = await createTestUser();
     actAs(user.id);
 
-    // Created oldest first; the in-play list is ordered by updatedAt desc.
+    // Touched oldest first; the in-play list is ordered by updatedAt desc.
     const first = await makeApp(user.id, "Alpha");
     const second = await makeApp(user.id, "Beta");
     const third = await makeApp(user.id, "Gamma");
+    await touchedAt(first.id, 30);
+    await touchedAt(second.id, 20);
+    await touchedAt(third.id, 10);
 
     const detail = await getApplicationDetail(second.id);
 
