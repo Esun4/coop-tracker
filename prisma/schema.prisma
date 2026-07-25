@@ -20,6 +20,13 @@ model User {
   googleRefreshToken String?
   lastEmailSync      DateTime?
 
+  // Appearance and scanning preferences live on the account, not in
+  // localStorage: they should follow you to another machine.
+  theme          String  @default("system") // light | dark | system
+  palette        String  @default("ledger") // ledger | ink
+  density        String  @default("compact") // compact | comfortable
+  scanFrequency  String  @default("manual") // manual | every6h | daily8am
+
   accounts        Account[]
   sessions        Session[]
   applications    Application[]

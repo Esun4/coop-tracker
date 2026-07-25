@@ -22,12 +22,15 @@ import {
 
 type StageSize = "sm" | "md" | "lg";
 
+// The `stage-chip-N` hooks let the Neutral ink palette lean on weight where it
+// has given up hue. They carry no styling in the default palette.
 const CHIP_TONE: Record<ApplicationStatusType, string> = {
-  APPLIED: "bg-chip-1 border-chip-1-border text-chip-1-foreground",
-  OA: "bg-chip-2 border-chip-2-border text-chip-2-foreground",
-  INTERVIEW: "bg-chip-3 border-chip-3-border text-chip-3-foreground",
-  FINAL_ROUND: "bg-chip-4 border-chip-4-border text-chip-4-foreground",
-  OFFER: "bg-chip-5 border-chip-5-border text-chip-5-foreground",
+  APPLIED: "bg-chip-1 border-chip-1-border text-chip-1-foreground stage-chip-1",
+  OA: "bg-chip-2 border-chip-2-border text-chip-2-foreground stage-chip-2",
+  INTERVIEW: "bg-chip-3 border-chip-3-border text-chip-3-foreground stage-chip-3",
+  FINAL_ROUND:
+    "bg-chip-4 border-chip-4-border text-chip-4-foreground stage-chip-4",
+  OFFER: "bg-chip-5 border-chip-5-border text-chip-5-foreground stage-chip-5",
   REJECTED: "bg-transparent border-chip-closed-border text-chip-closed-foreground",
   WITHDRAWN: "bg-transparent border-chip-closed-border text-chip-closed-foreground",
 };

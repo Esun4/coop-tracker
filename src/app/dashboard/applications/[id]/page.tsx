@@ -84,6 +84,7 @@ export default async function ApplicationDetailPage({
             href={prevId ? `/dashboard/applications/${prevId}` : "#"}
             aria-disabled={!prevId}
             aria-label="Previous application"
+            tabIndex={prevId ? undefined : -1}
             className={`border-border flex size-6 items-center justify-center rounded-sm border ${
               prevId ? "hover:text-foreground" : "pointer-events-none opacity-45"
             }`}
@@ -94,6 +95,7 @@ export default async function ApplicationDetailPage({
             href={nextId ? `/dashboard/applications/${nextId}` : "#"}
             aria-disabled={!nextId}
             aria-label="Next application"
+            tabIndex={nextId ? undefined : -1}
             className={`border-border flex size-6 items-center justify-center rounded-sm border ${
               nextId ? "hover:text-foreground" : "pointer-events-none opacity-45"
             }`}
@@ -144,6 +146,7 @@ export default async function ApplicationDetailPage({
         <div className="grid items-start gap-[22px] lg:grid-cols-[1fr_310px]">
           <div className="flex flex-col gap-[18px]">
             <DeadlineCard
+              key={application.id}
               applicationId={application.id}
               deadlineAt={application.deadlineAt}
               deadlineSource={application.deadlineSource}

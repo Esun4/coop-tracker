@@ -269,6 +269,61 @@
   --shadow-color: oklch(0.1 0.01 70 / 0.6);
 }
 
+/* ── Palette: "neutral ink" ─────────────────────────────────────
+   An appearance option, not a second theme. It swaps the ramp
+   variables only — surfaces, type and monograms stay exactly as
+   they are — so stage is carried by weight and the tick meter
+   instead of hue. Offers keep the primary: an offer is the one
+   thing worth a colour. */
+[data-palette="ink"] {
+  --stage-1: oklch(0.9 0.003 85);
+  --stage-2: oklch(0.78 0.004 82);
+  --stage-3: oklch(0.6 0.005 80);
+  --stage-4: oklch(0.42 0.006 75);
+  --stage-5: var(--primary);
+
+  --chip-1: transparent;
+  --chip-1-border: oklch(0.9 0.004 82);
+  --chip-1-foreground: var(--muted-foreground);
+  --chip-2: transparent;
+  --chip-2-border: oklch(0.88 0.004 82);
+  --chip-2-foreground: oklch(0.4 0.008 70);
+  --chip-3: transparent;
+  --chip-3-border: oklch(0.84 0.005 80);
+  --chip-3-foreground: oklch(0.3 0.01 65);
+  --chip-4: transparent;
+  --chip-4-border: oklch(0.78 0.006 78);
+  --chip-4-foreground: var(--foreground);
+  --chip-5: var(--primary);
+  --chip-5-border: transparent;
+  --chip-5-foreground: var(--primary-foreground);
+}
+
+.dark[data-palette="ink"],
+.dark [data-palette="ink"] {
+  --stage-1: oklch(0.32 0.004 75);
+  --stage-2: oklch(0.44 0.005 78);
+  --stage-3: oklch(0.58 0.006 80);
+  --stage-4: oklch(0.74 0.007 82);
+  --stage-5: var(--primary);
+
+  --chip-1-border: oklch(1 0 0 / 0.12);
+  --chip-2-border: oklch(1 0 0 / 0.16);
+  --chip-2-foreground: oklch(0.8 0.006 82);
+  --chip-3-border: oklch(1 0 0 / 0.22);
+  --chip-3-foreground: oklch(0.88 0.006 84);
+  --chip-4-border: oklch(1 0 0 / 0.3);
+  --chip-4-foreground: var(--foreground);
+}
+
+/* Weight does the work colour used to. */
+[data-palette="ink"] .stage-chip-3 {
+  font-weight: 600;
+}
+[data-palette="ink"] .stage-chip-4 {
+  font-weight: 700;
+}
+
 /* ── Base layer ─────────────────────────────────────────────── */
 @layer base {
   * {

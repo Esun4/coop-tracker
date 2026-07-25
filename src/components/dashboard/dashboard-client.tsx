@@ -39,6 +39,7 @@ import { syncGmailEmails } from "@/lib/actions/gmail";
 import type { Application, EmailSuggestion } from "@/generated/prisma/client";
 import { statusLabels, type ApplicationStatusType } from "@/lib/schemas";
 import { isInPlay } from "@/lib/stage";
+import { updatePreferences } from "@/lib/actions/preferences";
 import { toast } from "sonner";
 import {
   Plus,
@@ -59,7 +60,13 @@ interface DashboardData {
 
 const PAGE_SIZE = 50;
 
-export function DashboardClient({ initial }: { initial: DashboardData }) {
+export function DashboardClient({
+  initial,
+  initialDensity = "compact",
+}: {
+  initial: DashboardData;
+  initialDensity?: Density;
+}) {
   const [data, setData] = useState(initial);
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("");
@@ -70,7 +77,7 @@ export function DashboardClient({ initial }: { initial: DashboardData }) {
   const sortBy = "updatedAt";
   const sortOrder = "desc" as const;
   const [inPlayOnly, setInPlayOnly] = useState(true);
-  const [density, setDensity] = useState<Density>("compact");
+  const [density, setDensity] = useState<Density>(initialDensity);
   const [page, setPage] = useState(1);
   const [showAddForm, setShowAddForm] = useState(false);
   const [isPending, startTransition] = useTransition();
@@ -375,7 +382,10 @@ export function DashboardClient({ initial }: { initial: DashboardData }) {
             inPlayOnly={inPlayOnly}
             onInPlayOnlyChange={withPageReset(setInPlayOnly)}
             density={density}
-            onDensityChange={setDensity}
+            onDensityChange={(next) => {
+              setDensity(next);
+              void updatePreferences({ density: next });
+            }}
             shown={rows.length}
             total={data.stats.total}
           />
