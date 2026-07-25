@@ -4,8 +4,10 @@ import { z } from "zod";
  * Reminder vocabulary — shared by the settings screen and the server actions,
  * so it cannot live in the "use server" module.
  *
- * Email is the default channel: browser push needs an open tab and a
- * permission prompt, which is a lot to ask before the first useful nudge.
+ * Email is the channel that always works. Browser push is checked by default
+ * on the three time-critical kinds, matching the design, but it only ever
+ * delivers once the user has granted permission — until then those rows are
+ * email-only in practice.
  */
 
 export const REMINDER_KINDS = [

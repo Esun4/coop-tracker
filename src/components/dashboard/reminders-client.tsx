@@ -107,11 +107,15 @@ export function RemindersClient({ initial }: { initial: Initial }) {
   function patch(kind: ReminderKindName, next: Partial<ReminderSettings[ReminderKindName]>) {
     const current = settings[kind] ?? REMINDER_DEFAULTS[kind];
     const updated = { ...current, ...next };
+    const previous = settings;
     setSettings((s) => ({ ...s, [kind]: updated }));
 
     startTransition(async () => {
       const result = await updateReminderSettings({ [kind]: updated });
-      if (result.error) toast.error(result.error);
+      if (result.error) {
+        setSettings(previous);
+        toast.error(result.error);
+      }
     });
   }
 
@@ -120,10 +124,14 @@ export function RemindersClient({ initial }: { initial: Initial }) {
     for (const kind of REMINDER_KINDS) {
       next[kind] = { ...(settings[kind] ?? REMINDER_DEFAULTS[kind]), enabled };
     }
+    const previous = settings;
     setSettings(next);
     startTransition(async () => {
       const result = await updateReminderSettings(next);
-      if (result.error) toast.error(result.error);
+      if (result.error) {
+        setSettings(previous);
+        toast.error(result.error);
+      }
     });
   }
 
@@ -131,7 +139,10 @@ export function RemindersClient({ initial }: { initial: Initial }) {
     setDigestEnabled(enabled);
     startTransition(async () => {
       const result = await updateDigestSettings({ digestEnabled: enabled });
-      if (result.error) toast.error(result.error);
+      if (result.error) {
+        setDigestEnabled(!enabled);
+        toast.error(result.error);
+      }
     });
   }
 

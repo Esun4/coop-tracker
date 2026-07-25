@@ -11,7 +11,7 @@ import {
   resolveReminderSettings,
   type ReminderKindName,
 } from "@/lib/reminders";
-import type { ReminderKind } from "@/generated/prisma/client";
+import { ReminderKind } from "@/generated/prisma/client";
 
 async function getAuthUserId(): Promise<string> {
   const session = await auth();
@@ -109,8 +109,11 @@ export async function syncDeadlineReminders(applicationId: string) {
   });
   if (!application) return { error: "Application not found" };
 
+  // Only the two kinds this function owns. A silence nudge or a posting-closes
+  // reminder is scheduled elsewhere and must survive a deadline edit.
+  const DEADLINE_KINDS: ReminderKind[] = ["ASSESSMENT_DUE", "OFFER_DECISION"];
   await prisma.reminder.deleteMany({
-    where: { applicationId, userId, sentAt: null },
+    where: { applicationId, userId, sentAt: null, kind: { in: DEADLINE_KINDS } },
   });
 
   if (!application.deadlineAt) return { success: true, scheduled: 0 };
@@ -156,23 +159,6 @@ export async function syncDeadlineReminders(applicationId: string) {
   });
 
   return { success: true, scheduled: 1 };
-}
-
-/** Everything due to go out. The sender is not built yet — see the docs. */
-export async function getDueReminders(now = new Date()) {
-  return prisma.reminder.findMany({
-    where: {
-      sentAt: null,
-      scheduledFor: { lte: now },
-      OR: [{ snoozedUntil: null }, { snoozedUntil: { lte: now } }],
-    },
-    include: {
-      application: { select: { company: true, roleTitle: true, deadlineAt: true } },
-      user: { select: { email: true, quietHoursStart: true, quietHoursEnd: true } },
-    },
-    orderBy: { scheduledFor: "asc" },
-    take: 200,
-  });
 }
 
 export async function snoozeReminder(id: string, until: Date) {

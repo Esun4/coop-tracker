@@ -205,8 +205,13 @@ export async function setApplicationDeadline(
     },
   });
 
-  // A date without the nudge it implies is only half the feature.
-  await syncDeadlineReminders(id);
+  // A date without the nudge it implies is only half the feature — but the
+  // deadline is already saved, so a scheduling failure must not read as one.
+  try {
+    await syncDeadlineReminders(id);
+  } catch (error) {
+    console.error("Failed to schedule reminders for", id, error);
+  }
 
   revalidatePath(`/dashboard/applications/${id}`);
   revalidatePath("/dashboard");

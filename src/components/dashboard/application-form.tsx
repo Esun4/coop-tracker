@@ -75,6 +75,8 @@ export function ApplicationForm({
     setRoleTitle(application?.roleTitle ?? "");
     setLocation(application?.location ?? "");
     setApplicationDate(toDateString(application?.applicationDate));
+    // Editing reveals the optional fields; a fresh add folds them away again.
+    setShowOptional(!!application);
     setStatus(application?.status ?? "APPLIED");
     setSource(application?.source ?? "");
     setNotes(application?.notes ?? "");

@@ -181,8 +181,11 @@ export function SettingsClient({ initial }: { initial: Initial }) {
   const { setTheme } = useTheme();
 
   function save(patch: Preferences) {
-    // Optimistic: an appearance switch that lags feels broken.
-    setPrefs((p) => ({ ...p, ...patch }));
+    // Optimistic: an appearance switch that lags feels broken. Keep the old
+    // values so a rejected save can put the screen back where it was.
+    const previous = prefs;
+    const next = { ...prefs, ...patch };
+    setPrefs(next);
     if (patch.theme) setTheme(patch.theme);
     if (patch.palette) {
       document.documentElement.dataset.palette = patch.palette;
@@ -190,7 +193,12 @@ export function SettingsClient({ initial }: { initial: Initial }) {
 
     startTransition(async () => {
       const result = await updatePreferences(patch);
-      if (result.error) toast.error(result.error);
+      if (!result.error) return;
+
+      setPrefs(previous);
+      setTheme(previous.theme);
+      document.documentElement.dataset.palette = previous.palette;
+      toast.error(result.error);
     });
   }
 
@@ -232,7 +240,7 @@ export function SettingsClient({ initial }: { initial: Initial }) {
               </p>
             </div>
             {initial.gmailConnected && (
-              <Button variant="outline" size="sm">
+              <Button variant="outline" size="sm" disabled title="Not wired up yet">
                 Disconnect
               </Button>
             )}
@@ -336,7 +344,7 @@ export function SettingsClient({ initial }: { initial: Initial }) {
             title="Export everything"
             description="Applications, activity and suggestions as CSV"
           >
-            <Button variant="outline" size="sm">
+            <Button variant="outline" size="sm" disabled title="Not wired up yet">
               Download
             </Button>
           </Row>
@@ -348,6 +356,8 @@ export function SettingsClient({ initial }: { initial: Initial }) {
             <Button
               variant="outline"
               size="sm"
+              disabled
+              title="Not wired up yet"
               className="border-destructive/40 text-destructive"
             >
               Delete

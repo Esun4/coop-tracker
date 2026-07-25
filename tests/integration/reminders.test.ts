@@ -10,8 +10,8 @@ import {
   getReminderSettings,
   updateReminderSettings,
   syncDeadlineReminders,
-  getDueReminders,
 } from "@/lib/actions/reminders";
+import { getDueReminders } from "@/lib/reminder-queue";
 import { setApplicationDeadline } from "@/lib/actions/applications";
 
 const mockedAuth = vi.mocked(auth);

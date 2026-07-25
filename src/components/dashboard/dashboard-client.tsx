@@ -145,6 +145,8 @@ export function DashboardClient({
   // Says which filter emptied the table, and how much sits behind it.
   const filterSummary = useMemo(() => {
     if (rows.length > 0) return null;
+    // An account with nothing in it gets the empty state, not a filter story.
+    if (data.stats.total === 0) return null;
     const clauses: string[] = [];
     if (search) clauses.push(`“${search}”`);
     if (statusFilter && statusFilter !== "all") {
@@ -447,6 +449,7 @@ export function DashboardClient({
         onAccept={handleAcceptSuggestion}
         onDismiss={handleDismissSuggestion}
         onAcceptAll={handleAcceptAll}
+        acceptingAll={acceptingAll}
         onNeedsReview={() => {
           // Anything we cannot apply on its own hands off to the fuller flow.
           setShowReview(false);

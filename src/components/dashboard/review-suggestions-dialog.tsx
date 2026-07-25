@@ -48,6 +48,7 @@ export function ReviewSuggestionsDialog({
   suggestions,
   applications,
   scannedCount,
+  acceptingAll = false,
   onAccept,
   onDismiss,
   onAcceptAll,
@@ -58,6 +59,7 @@ export function ReviewSuggestionsDialog({
   suggestions: EmailSuggestion[];
   applications: Application[];
   scannedCount?: number;
+  acceptingAll?: boolean;
   onAccept: (suggestion: EmailSuggestion, application: Application) => void;
   onDismiss: (suggestion: EmailSuggestion) => void;
   onAcceptAll: () => void;
@@ -87,9 +89,11 @@ export function ReviewSuggestionsDialog({
         event.preventDefault();
         setCursor((c) => Math.max(c - 1, 0));
       } else if (key === "a") {
+        // Same condition as the row's own button: without a match and a target
+        // stage there is nothing to apply, so hand off rather than guess.
         const match = matchFor(current, applications);
         event.preventDefault();
-        if (match) onAccept(current, match);
+        if (match && current.suggestedStatus) onAccept(current, match);
         else onNeedsReview(current);
       } else if (key === "x") {
         event.preventDefault();
@@ -117,8 +121,13 @@ export function ReviewSuggestionsDialog({
             </DialogDescription>
           </div>
           {suggestions.length > 1 && (
-            <Button variant="outline" size="sm" onClick={onAcceptAll}>
-              Accept all {suggestions.length}
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={onAcceptAll}
+              disabled={acceptingAll}
+            >
+              {acceptingAll ? "Accepting…" : `Accept all ${suggestions.length}`}
             </Button>
           )}
         </div>
