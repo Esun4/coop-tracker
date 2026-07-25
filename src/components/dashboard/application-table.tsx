@@ -19,10 +19,11 @@ import {
   Inbox,
 } from "lucide-react";
 import {
-  statusLabels,
   applicationStatuses,
   type ApplicationStatusType,
 } from "@/lib/schemas";
+import { StageChip, StageMeter } from "@/components/ui/stage-indicator";
+import { Monogram } from "@/components/ui/monogram";
 import {
   archiveApplication,
   deleteApplication,
@@ -42,24 +43,6 @@ interface ApplicationTableProps {
 
 const GRID_COLS =
   "[grid-template-columns:1.25fr_1.3fr_118px_76px_110px_96px_40px]";
-
-// Deterministic accent per company so monograms are stable across renders.
-const MONOGRAM_HUES = [
-  "bg-indigo-500/12 text-indigo-700 dark:bg-indigo-400/15 dark:text-indigo-300",
-  "bg-emerald-500/12 text-emerald-700 dark:bg-emerald-400/15 dark:text-emerald-300",
-  "bg-amber-500/15 text-amber-700 dark:bg-amber-400/15 dark:text-amber-300",
-  "bg-purple-500/12 text-purple-700 dark:bg-purple-400/15 dark:text-purple-300",
-  "bg-rose-500/12 text-rose-700 dark:bg-rose-400/15 dark:text-rose-300",
-  "bg-sky-500/12 text-sky-700 dark:bg-sky-400/15 dark:text-sky-300",
-];
-
-function monogramClass(name: string): string {
-  let hash = 0;
-  for (let i = 0; i < name.length; i++) {
-    hash = (hash * 31 + name.charCodeAt(i)) | 0;
-  }
-  return MONOGRAM_HUES[Math.abs(hash) % MONOGRAM_HUES.length];
-}
 
 function InlineStatusSelect({
   application,
@@ -89,10 +72,15 @@ function InlineStatusSelect({
       <DropdownMenuTrigger
         render={
           <button
-            className={`inline-flex items-center rounded-md px-2 py-0.5 text-xs font-medium transition-opacity hover:opacity-80 status-${status}`}
+            className="inline-flex items-center gap-[9px] transition-opacity hover:opacity-80"
             disabled={loading}
           >
-            {loading ? "…" : statusLabels[status]}
+            {loading ? (
+              <span className="text-micro text-muted-foreground">…</span>
+            ) : (
+              <StageChip status={status} />
+            )}
+            <StageMeter status={status} />
           </button>
         }
       />
@@ -103,8 +91,7 @@ function InlineStatusSelect({
             onClick={() => handleStatusChange(s)}
             className={application.status === s ? "font-semibold" : ""}
           >
-            <span className={`mr-2 inline-block h-2 w-2 rounded-full status-${s}`} />
-            {statusLabels[s]}
+            <StageChip status={s} />
           </DropdownMenuItem>
         ))}
       </DropdownMenuContent>
@@ -211,11 +198,7 @@ export function ApplicationTable({
               }`}
             >
               <span className="flex items-center gap-2.5 pr-2 min-w-0">
-                <span
-                  className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-xs font-semibold ${monogramClass(app.company)}`}
-                >
-                  {app.company.trim().charAt(0).toUpperCase() || "?"}
-                </span>
+                <Monogram name={app.company} />
                 <span className="text-sm font-medium truncate text-foreground">
                   {app.company}
                 </span>

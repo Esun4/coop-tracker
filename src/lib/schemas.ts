@@ -12,24 +12,16 @@ export const applicationStatuses = [
 
 export type ApplicationStatusType = (typeof applicationStatuses)[number];
 
+// Display labels. `OA` reads as "Assessment" in the UI — a display-layer
+// rename only, the enum and every stored row are untouched.
 export const statusLabels: Record<ApplicationStatusType, string> = {
   APPLIED: "Applied",
-  OA: "OA",
+  OA: "Assessment",
   INTERVIEW: "Interview",
-  FINAL_ROUND: "Final Round",
+  FINAL_ROUND: "Final round",
   OFFER: "Offer",
   REJECTED: "Rejected",
   WITHDRAWN: "Withdrawn",
-};
-
-export const statusColors: Record<ApplicationStatusType, string> = {
-  APPLIED: "bg-indigo-100 text-indigo-800 dark:bg-indigo-500/15 dark:text-indigo-300",
-  OA: "bg-yellow-100 text-yellow-800 dark:bg-yellow-500/15 dark:text-yellow-300",
-  INTERVIEW: "bg-purple-100 text-purple-800 dark:bg-purple-500/15 dark:text-purple-300",
-  FINAL_ROUND: "bg-orange-100 text-orange-800 dark:bg-orange-500/15 dark:text-orange-300",
-  OFFER: "bg-green-100 text-green-800 dark:bg-green-500/15 dark:text-green-300",
-  REJECTED: "bg-red-100 text-red-800 dark:bg-red-500/15 dark:text-red-300",
-  WITHDRAWN: "bg-gray-100 text-gray-800 dark:bg-gray-500/15 dark:text-gray-300",
 };
 
 // Inputs for cover-letter tailoring. Bounds serve two jobs: reject junk before

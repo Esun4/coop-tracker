@@ -27,11 +27,8 @@ import {
   Check,
   ScanText,
 } from "lucide-react";
-import {
-  applicationStatuses,
-  statusLabels,
-  statusColors,
-} from "@/lib/schemas";
+import { applicationStatuses, statusLabels } from "@/lib/schemas";
+import { StageChip } from "@/components/ui/stage-indicator";
 import {
   dismissSuggestion,
   acceptNewApplication,
@@ -273,13 +270,7 @@ function SuggestionReviewModal({
           {current.suggestedStatus && (
             <p>
               <span className="font-medium">Status:</span>{" "}
-              <span
-                className={`inline-flex rounded-full px-2 py-0.5 text-xs font-medium ${
-                  statusColors[current.suggestedStatus] ?? ""
-                }`}
-              >
-                {statusLabels[current.suggestedStatus] ?? current.suggestedStatus}
-              </span>
+              <StageChip status={current.suggestedStatus} />
             </p>
           )}
           {current.reasoning && (
