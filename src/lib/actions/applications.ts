@@ -561,3 +561,101 @@ export async function getDistinctSources() {
 
   return results.map((r: { source: string | null }) => r.source).filter(Boolean) as string[];
 }
+
+/**
+ * The stage ladder: how far each application ever got, not where it stands.
+ *
+ * An application that interviewed and was then rejected still cleared the
+ * assessment and the interview, so the ladder counts it at both. Standing
+ * counts would make every rung shrink as the cycle closes out.
+ */
+export async function getLadder() {
+  const userId = await getAuthUserId();
+
+  const rows = await prisma.$queryRaw<{ stage: string; count: bigint }[]>`
+    WITH reached AS (
+      SELECT a.id, a.status::text AS current_status,
+             COALESCE(
+               array_agg(l.details -> 'status' ->> 'to')
+                 FILTER (WHERE l.details -> 'status' ->> 'to' IS NOT NULL),
+               '{}'
+             ) AS ever
+      FROM "Application" a
+      LEFT JOIN "ActivityLog" l
+        ON l."applicationId" = a.id AND l.action = 'updated'
+      WHERE a."userId" = ${userId} AND a.archived = false
+      GROUP BY a.id, a.status
+    )
+    SELECT s.stage, COUNT(*)::bigint AS count
+    FROM reached r
+    CROSS JOIN LATERAL (
+      VALUES ('APPLIED'), ('OA'), ('INTERVIEW'), ('FINAL_ROUND'), ('OFFER')
+    ) AS s(stage)
+    WHERE s.stage = 'APPLIED'
+       OR s.stage = ANY(r.ever)
+       OR r.current_status = s.stage
+    GROUP BY s.stage
+  `;
+
+  const counts: Record<string, number> = {
+    APPLIED: 0,
+    OA: 0,
+    INTERVIEW: 0,
+    FINAL_ROUND: 0,
+    OFFER: 0,
+  };
+  for (const row of rows) counts[row.stage] = Number(row.count);
+  return counts;
+}
+
+/** Sent, replied, interviewed and offered, broken down by where it came from. */
+export async function getSourceBreakdown() {
+  const userId = await getAuthUserId();
+
+  const rows = await prisma.$queryRaw<
+    {
+      source: string | null;
+      sent: bigint;
+      replied: bigint;
+      interviewed: bigint;
+      offered: bigint;
+    }[]
+  >`
+    WITH reached AS (
+      SELECT a.id, a.source, a.status::text AS current_status,
+             COALESCE(
+               array_agg(l.details -> 'status' ->> 'to')
+                 FILTER (WHERE l.details -> 'status' ->> 'to' IS NOT NULL),
+               '{}'
+             ) AS ever
+      FROM "Application" a
+      LEFT JOIN "ActivityLog" l
+        ON l."applicationId" = a.id AND l.action = 'updated'
+      WHERE a."userId" = ${userId} AND a.archived = false
+      GROUP BY a.id, a.source, a.status
+    )
+    SELECT source,
+           COUNT(*)::bigint AS sent,
+           COUNT(*) FILTER (
+             WHERE current_status <> 'APPLIED' AND current_status <> 'WITHDRAWN'
+           )::bigint AS replied,
+           COUNT(*) FILTER (
+             WHERE current_status IN ('INTERVIEW', 'FINAL_ROUND', 'OFFER')
+                OR ever && ARRAY['INTERVIEW', 'FINAL_ROUND', 'OFFER']
+           )::bigint AS interviewed,
+           COUNT(*) FILTER (
+             WHERE current_status = 'OFFER' OR ever && ARRAY['OFFER']
+           )::bigint AS offered
+    FROM reached
+    GROUP BY source
+    ORDER BY sent DESC
+  `;
+
+  return rows.map((row) => ({
+    source: row.source || "Unspecified",
+    sent: Number(row.sent),
+    replied: Number(row.replied),
+    interviewed: Number(row.interviewed),
+    offered: Number(row.offered),
+  }));
+}

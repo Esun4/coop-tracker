@@ -15,8 +15,8 @@ import {
   ChevronDown,
   LayoutDashboard,
   FileText,
-  FileUser,
   BarChart2,
+  Settings,
   Sun,
   Moon,
 } from "lucide-react";
@@ -28,11 +28,12 @@ interface DashboardNavProps {
   };
 }
 
+// Three destinations, not four: resume and cover letter were two near-identical
+// pages asking for the same posting, so they merge under Documents.
 const navLinks = [
-  { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
-  { href: "/dashboard/cover-letter", label: "Cover Letter", icon: FileText },
-  { href: "/dashboard/resume", label: "Resume", icon: FileUser },
-  { href: "/dashboard/analytics", label: "Analytics", icon: BarChart2 },
+  { href: "/dashboard", label: "Applications", icon: LayoutDashboard },
+  { href: "/dashboard/analytics", label: "Insights", icon: BarChart2 },
+  { href: "/dashboard/documents", label: "Documents", icon: FileText },
 ];
 
 export function DashboardNav({ user }: DashboardNavProps) {
@@ -68,13 +69,13 @@ export function DashboardNav({ user }: DashboardNavProps) {
                 <Link
                   key={href}
                   href={href}
-                  className={`flex items-center gap-2 rounded-md px-3 py-1.5 text-sm font-medium transition-colors ${
+                  className={`text-body flex items-center gap-[7px] rounded-md px-[11px] py-1.5 font-medium transition-colors ${
                     active
-                      ? "bg-primary/10 text-primary"
-                      : "text-muted-foreground hover:bg-muted hover:text-foreground"
+                      ? "bg-secondary text-foreground"
+                      : "text-muted-foreground hover:text-foreground"
                   }`}
                 >
-                  <Icon className="h-3.5 w-3.5" />
+                  <Icon className="size-3.5 opacity-60" />
                   <span className="hidden sm:block">{label}</span>
                 </Link>
               );
@@ -106,6 +107,13 @@ export function DashboardNav({ user }: DashboardNavProps) {
               )}
               <p className="text-xs text-muted-foreground">{user.email}</p>
             </div>
+            <DropdownMenuItem
+              render={<Link href="/dashboard/settings" />}
+              className="mx-1 my-1 cursor-pointer"
+            >
+              <Settings className="mr-2 h-3.5 w-3.5" />
+              Settings
+            </DropdownMenuItem>
             <DropdownMenuItem
               onClick={() => signOut({ callbackUrl: "/auth/signin" })}
               className="mx-1 my-1 cursor-pointer"

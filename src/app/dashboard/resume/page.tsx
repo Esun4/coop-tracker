@@ -1,5 +1,6 @@
-import { ResumeTailor } from "@/components/dashboard/resume-tailor";
+import { redirect } from "next/navigation";
 
+/** Resume and cover letter merged into one workspace. */
 export default function ResumePage() {
-  return <ResumeTailor />;
+  redirect("/dashboard/documents");
 }

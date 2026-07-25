@@ -71,16 +71,6 @@ export function CoverLetterTailor() {
 
   return (
     <div className="space-y-6">
-      {/* Page heading */}
-      <div className="space-y-1">
-        <h1 className="font-heading text-3xl font-semibold tracking-tight">
-          Cover Letter Tailoring
-        </h1>
-        <p className="text-sm text-muted-foreground">
-          Paste your base cover letter and a job description, and generate a
-          tailored version targeted to the role.
-        </p>
-      </div>
 
       <div className="grid gap-6 lg:grid-cols-2">
         {/* Inputs */}
