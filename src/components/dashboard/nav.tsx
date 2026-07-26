@@ -1,9 +1,12 @@
 "use client";
 
 import Link from "next/link";
+import { useTransition } from "react";
 import { usePathname } from "next/navigation";
 import { signOut } from "next-auth/react";
 import { useTheme } from "next-themes";
+import { toast } from "sonner";
+import { updatePreferences } from "@/lib/actions/preferences";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -49,7 +52,9 @@ export function DashboardNav({ user }: DashboardNavProps) {
 
   return (
     <header className="border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
-      <div className="flex h-14 items-center justify-between px-8 lg:px-16">
+      {/* Same width cage as <main> in the dashboard layout, so the wordmark
+          lines up with the content edge instead of drifting on wide screens. */}
+      <div className="mx-auto flex h-14 w-full max-w-[1720px] items-center justify-between px-6 lg:px-10">
         {/* Wordmark + nav */}
         <div className="flex items-center gap-6 lg:gap-8">
           <Link href="/dashboard" className="flex items-baseline shrink-0">
@@ -129,13 +134,55 @@ export function DashboardNav({ user }: DashboardNavProps) {
   );
 }
 
+/**
+ * Flips light/dark and writes the choice to the account.
+ *
+ * Persisting matters: theme is a stored preference (Settings → Appearance reads
+ * the same column), so a toggle that only moved next-themes' local state would
+ * be undone by `PreferencesSync` on the next load. Optimistic — the class flips
+ * immediately and only rolls back if the save is rejected.
+ */
 function ThemeToggle() {
   const { resolvedTheme, setTheme } = useTheme();
+  const [isPending, startTransition] = useTransition();
+
+  function toggle() {
+    // One write in flight at a time: two fast clicks would race two saves, and
+    // the loser's rollback would fight the winner's optimistic state.
+    if (isPending) return;
+
+    // `resolvedTheme` is undefined until next-themes has mounted, and the button
+    // is clickable before then. The class on <html> is written by next-themes'
+    // blocking script, so it is correct from the first paint — read it as the
+    // fallback rather than assuming light and sending the first click nowhere.
+    const isDark = resolvedTheme
+      ? resolvedTheme === "dark"
+      : document.documentElement.classList.contains("dark");
+    const previous = isDark ? "dark" : "light";
+    const next = isDark ? "light" : "dark";
+    setTheme(next);
+
+    startTransition(async () => {
+      // The action returns `{ error }` for a rejected value, but *throws* on an
+      // expired session or a dropped request. Both have to put the theme back,
+      // or the screen keeps a change the account never stored.
+      try {
+        const result = await updatePreferences({ theme: next });
+        if (!result.error) return;
+        setTheme(previous);
+        toast.error(result.error);
+      } catch {
+        setTheme(previous);
+        toast.error("Could not save your theme.");
+      }
+    });
+  }
 
   return (
     <button
-      onClick={() => setTheme(resolvedTheme === "dark" ? "light" : "dark")}
-      className="flex h-8 w-8 items-center justify-center rounded-md border text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+      onClick={toggle}
+      disabled={isPending}
+      className="flex h-8 w-8 items-center justify-center rounded-md border text-muted-foreground transition-colors hover:bg-muted hover:text-foreground disabled:cursor-default"
       aria-label="Toggle theme"
     >
       {/* Both icons rendered; CSS picks one so server and client markup match */}

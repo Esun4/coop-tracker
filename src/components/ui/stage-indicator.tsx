@@ -35,6 +35,10 @@ const CHIP_TONE: Record<ApplicationStatusType, string> = {
   WITHDRAWN: "bg-transparent border-chip-closed-border text-chip-closed-foreground",
 };
 
+// Straight from the handoff: 2px/7px at 11.5px in a row, 2px/8px at 12px in the
+// detail header. Every chip in the app is sized from here — tune this map, not
+// callers. These sizes only take effect because `cn` knows the custom type
+// scale; see the tailwind-merge config in `src/lib/utils.ts`.
 const CHIP_SIZE: Record<StageSize, string> = {
   sm: "px-[7px] py-px text-micro",
   md: "px-[7px] py-0.5 text-micro",

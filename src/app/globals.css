@@ -90,22 +90,45 @@
 
   --font-weight-emphasis: 550;
 
-  --text-label: 11px;
+  /* The px values below are the handoff's scale verbatim; `--ui-scale` (in
+     :root) multiplies all of them at once. The prototype was drawn in a 1280px
+     frame and its 13.5px body reads cramped at the widths the app actually runs
+     at. Resizing type is one number, not fourteen — change `--ui-scale` and the
+     whole hierarchy moves together, ratios intact. Line heights are unitless
+     and follow on their own. */
+  --text-label: calc(11px * var(--ui-scale, 1));
   --text-label--line-height: 1.4;
-  --text-micro: 11.5px;
+  --text-micro: calc(11.5px * var(--ui-scale, 1));
   --text-micro--line-height: 1.45;
-  --text-caption: 12px;
+  --text-caption: calc(12px * var(--ui-scale, 1));
   --text-caption--line-height: 1.5;
-  --text-meta: 12.5px;
+  --text-meta: calc(12.5px * var(--ui-scale, 1));
   --text-meta--line-height: 1.5;
-  --text-body: 13.5px;
+  --text-body: calc(13.5px * var(--ui-scale, 1));
   --text-body--line-height: 1.55;
-  --text-lede: 14.5px;
+  --text-lede: calc(14.5px * var(--ui-scale, 1));
   --text-lede--line-height: 1.5;
-  --text-title: 26px;
+  --text-title: calc(26px * var(--ui-scale, 1));
   --text-title--line-height: 1.15;
-  --text-metric: 40px;
+  --text-metric: calc(40px * var(--ui-scale, 1));
   --text-metric--line-height: 1;
+
+  /* Tailwind's stock steps, mapped onto the same scale. Pre-redesign dialogs
+     and forms still use these, so leaving them behind would split the app into
+     two type sizes. */
+  --text-xs: calc(12px * var(--ui-scale, 1));
+  --text-xs--line-height: 1.45;
+  --text-sm: calc(13.5px * var(--ui-scale, 1));
+  --text-sm--line-height: 1.5;
+  --text-base: calc(15px * var(--ui-scale, 1));
+  --text-base--line-height: 1.55;
+  /* Headings on the auth and legal pages. Tailwind's default px, scaled — left
+     out, they would shrink relative to the body text around them. */
+  --text-lg: calc(18px * var(--ui-scale, 1));
+  --text-xl: calc(20px * var(--ui-scale, 1));
+  --text-2xl: calc(24px * var(--ui-scale, 1));
+  --text-3xl: calc(30px * var(--ui-scale, 1));
+  --text-4xl: calc(36px * var(--ui-scale, 1));
 
   --tracking-label: 0.12em;
   --tracking-column: 0.1em;
@@ -139,6 +162,12 @@
 /* ── Theme: "editorial ledger", light ────────────────────────────
    Warm paper, warm ink, one deep racing-green ramp. No page wash. */
 :root {
+  /* Global type multiplier. Every step in the `@theme` type scale — ours and
+     Tailwind's stock xs/sm/base — is `design px * this`. 1 is the handoff's
+     original scale; 1.15 is where it sits now. This is the one number to change
+     when the app reads too small or too large. */
+  --ui-scale: 1.15;
+
   --background: oklch(0.975 0.005 85);
   --foreground: oklch(0.22 0.012 60);
   --foreground-2: oklch(0.34 0.012 65);
