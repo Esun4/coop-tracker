@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useRef, useState, type ReactNode } from "react";
 import Link from "next/link";
 import {
   DropdownMenu,
@@ -34,10 +34,12 @@ import {
   updateApplicationStatus,
 } from "@/lib/actions/applications";
 import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
 import { ApplicationForm } from "./application-form";
 import { toast } from "sonner";
 import type { Application } from "@/generated/prisma/client";
-import { TABLE_COLS, TABLE_HEADINGS } from "./table-layout";
+import { tableCols, TABLE_HEADINGS } from "./table-layout";
+import { headerState, type Selection } from "@/lib/selection";
 
 export type Density = "compact" | "comfortable";
 
@@ -54,6 +56,17 @@ interface ApplicationTableProps {
   /** Present only when a filter is what emptied the table. */
   filterSummary?: { description: string; totalWithout: number | null } | null;
   onClearFilters?: () => void;
+  /** Off by default: with no selection there is no checkbox column at all. */
+  selectionMode?: boolean;
+  selection?: Selection;
+  /**
+   * `orderedIds` is the row order as rendered — grouped, current page — which is
+   * the order a shift-range has to follow to match what the user is looking at.
+   */
+  onToggleRow?: (id: string, extend: boolean, orderedIds: string[]) => void;
+  onToggleAll?: (select: boolean, orderedIds: string[]) => void;
+  /** Rendered inside the table card, above the column headers. */
+  bulkBar?: ReactNode;
 }
 
 const ROW_PAD: Record<Density, string> = {
@@ -137,8 +150,19 @@ export function ApplicationTable({
   onUpdate,
   filterSummary,
   onClearFilters,
+  selectionMode = false,
+  selection,
+  onToggleRow,
+  onToggleAll,
+  bulkBar,
 }: ApplicationTableProps) {
   const [editApp, setEditApp] = useState<Application | null>(null);
+  /**
+   * Whether the click that is about to toggle a row held shift. Captured on the
+   * way down because the checkbox re-dispatches its own click internally, so by
+   * the time the change handler runs the original modifier keys are gone.
+   */
+  const extendRef = useRef(false);
 
   async function handleArchive(id: string) {
     const result = await archiveApplication(id);
@@ -226,11 +250,35 @@ export function ApplicationTable({
 
   const hiddenClosed = closedCount.rejected + closedCount.withdrawn;
 
+  // Render order, flattened: what a shift-range walks along.
+  const orderedIds = groups.flatMap(({ rows }) => rows.map((row) => row.id));
+  const selectedIds = selection?.ids;
+  const header = selection ? headerState(selection, orderedIds) : "none";
+  const cols = tableCols(selectionMode);
+
   return (
     <>
       <div className="bg-card border-border overflow-hidden rounded-xl border">
+        {bulkBar}
+
         {/* Column headers are chrome: they paint before any data arrives. */}
-        <div className={`${TABLE_COLS} bg-sunken border-border border-b py-[9px]`}>
+        <div className={`${cols} bg-sunken border-border border-b py-[9px]`}>
+          {selectionMode && (
+            <span className="flex items-center">
+              <Checkbox
+                checked={header === "all"}
+                indeterminate={header === "some"}
+                onCheckedChange={() =>
+                  onToggleAll?.(header !== "all", orderedIds)
+                }
+                aria-label={
+                  header === "all"
+                    ? "Clear selection on this page"
+                    : "Select every row on this page"
+                }
+              />
+            </span>
+          )}
           {TABLE_HEADINGS.map(
             (label) => (
               <span
@@ -262,10 +310,33 @@ export function ApplicationTable({
             {rows.map((app) => (
               <div
                 key={app.id}
-                className={`ledger-row ${TABLE_COLS} border-border-subtle items-center border-b ${ROW_PAD[density]} ${
+                className={`ledger-row ${cols} border-border-subtle items-center border-b ${ROW_PAD[density]} ${
                   app.archived ? "opacity-50" : ""
-                }`}
+                } ${selectedIds?.has(app.id) ? "bg-attn" : ""}`}
               >
+                {selectionMode && (
+                  // Capture phase: pointerdown and keydown both land before the
+                  // checkbox's own click, which is the only place shift is still
+                  // readable.
+                  <span
+                    className="flex items-center"
+                    onPointerDownCapture={(e) => {
+                      extendRef.current = e.shiftKey;
+                    }}
+                    onKeyDownCapture={(e) => {
+                      extendRef.current = e.shiftKey;
+                    }}
+                  >
+                    <Checkbox
+                      checked={selectedIds?.has(app.id) ?? false}
+                      onCheckedChange={() =>
+                        onToggleRow?.(app.id, extendRef.current, orderedIds)
+                      }
+                      aria-label={`Select ${app.company} — ${app.roleTitle}`}
+                    />
+                  </span>
+                )}
+
                 <span className="flex min-w-0 items-center gap-[11px] pr-3">
                   <Monogram name={app.company} />
                   <span className="min-w-0">

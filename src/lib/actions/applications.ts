@@ -11,6 +11,26 @@ import { syncDeadlineReminders } from "@/lib/actions/reminders";
 const statusSchema = z.enum(applicationStatuses);
 const MAX_IMPORT_ROWS = 1000;
 
+/**
+ * Ceiling on one bulk action. The table pages at 50, so this is well clear of
+ * anything selectable by hand — it exists to bound the work a single call can
+ * ask for, since the deadline path schedules reminders one application at a
+ * time.
+ */
+const MAX_BULK_IDS = 200;
+
+/** How many reminder schedules run at once inside one bulk deadline change. */
+const SCHEDULE_BATCH_SIZE = 10;
+
+const bulkIdsSchema = z
+  .array(z.string().min(1, "Invalid application id"))
+  .min(1, "Nothing selected")
+  .max(MAX_BULK_IDS, `Select at most ${MAX_BULK_IDS} applications at once`);
+
+const bulkDeadlineSchema = z.object({
+  deadlineAt: z.string().min(1).nullable(),
+});
+
 async function getAuthUserId(): Promise<string> {
   const session = await auth();
   if (!session?.user?.id) throw new Error("Unauthorized");
@@ -388,6 +408,150 @@ export async function deleteApplication(id: string) {
 
   revalidatePath("/dashboard");
   return { success: true };
+}
+
+/**
+ * Move a whole selection to one stage. Rows already at that stage are counted
+ * as skipped rather than rewritten, so a bulk action does not fill the activity
+ * feed with entries where nothing changed.
+ *
+ * Ids arrive from the client and are treated as claims, not facts: every write
+ * is scoped by `userId`, and rows that don't resolve are silently absent from
+ * the result instead of failing the batch.
+ */
+export async function bulkUpdateStatus(ids: unknown, status: unknown) {
+  const userId = await getAuthUserId();
+
+  const parsedIds = bulkIdsSchema.safeParse(ids);
+  if (!parsedIds.success) return { error: parsedIds.error.issues[0].message };
+
+  const parsedStatus = statusSchema.safeParse(status);
+  if (!parsedStatus.success) return { error: "Invalid status" };
+
+  const unique = [...new Set(parsedIds.data)];
+  const existing = await prisma.application.findMany({
+    where: { id: { in: unique }, userId },
+    select: { id: true, status: true },
+  });
+  if (existing.length === 0) return { error: "No applications found" };
+
+  const next = parsedStatus.data as ApplicationStatus;
+  const changing = existing.filter((app) => app.status !== next);
+
+  if (changing.length > 0) {
+    // One transaction: a selection that half-moved, with logs for the other
+    // half, is worse than a failure the user can retry.
+    await prisma.$transaction([
+      prisma.application.updateMany({
+        where: { id: { in: changing.map((app) => app.id) }, userId },
+        data: { status: next },
+      }),
+      prisma.activityLog.createMany({
+        data: changing.map((app) => ({
+          userId,
+          applicationId: app.id,
+          action: "updated",
+          details: { status: { from: app.status, to: next } },
+          source: ActivitySource.manual,
+        })),
+      }),
+    ]);
+  }
+
+  revalidatePath("/dashboard");
+  return {
+    success: true,
+    updated: changing.length,
+    skipped: existing.length - changing.length,
+  };
+}
+
+/**
+ * Put the same date on a whole selection, or clear it off all of them.
+ *
+ * Reminders cannot be scheduled in one query the way the date can: each one
+ * depends on that application's stage and the user's per-kind settings, so the
+ * sweep runs per row. As in the single-application path, a scheduling failure
+ * must not read as a failure to save the date.
+ */
+export async function bulkSetDeadline(ids: unknown, input: unknown) {
+  const userId = await getAuthUserId();
+
+  const parsedIds = bulkIdsSchema.safeParse(ids);
+  if (!parsedIds.success) return { error: parsedIds.error.issues[0].message };
+
+  const parsedInput = bulkDeadlineSchema.safeParse(input);
+  if (!parsedInput.success) return { error: "That date isn't valid" };
+
+  let deadlineAt: Date | null = null;
+  if (parsedInput.data.deadlineAt) {
+    const parsed = new Date(parsedInput.data.deadlineAt);
+    if (Number.isNaN(parsed.getTime())) return { error: "That date isn't valid" };
+    deadlineAt = parsed;
+  }
+
+  const unique = [...new Set(parsedIds.data)];
+  const existing = await prisma.application.findMany({
+    where: { id: { in: unique }, userId },
+    select: { id: true },
+  });
+  if (existing.length === 0) return { error: "No applications found" };
+
+  const targetIds = existing.map((app) => app.id);
+
+  await prisma.$transaction([
+    prisma.application.updateMany({
+      where: { id: { in: targetIds }, userId },
+      data: {
+        deadlineAt,
+        // Setting a date by hand takes ownership away from the classifier, so
+        // the sentence it was read out of no longer describes this date.
+        deadlineSource: deadlineAt ? "manual" : null,
+        deadlineNote: null,
+      },
+    }),
+    prisma.activityLog.createMany({
+      data: targetIds.map((id) => ({
+        userId,
+        applicationId: id,
+        action: "updated",
+        details: { deadline: deadlineAt ? deadlineAt.toISOString() : null },
+        source: ActivitySource.manual,
+      })),
+    }),
+  ]);
+
+  // Scheduling cannot collapse into one query — each application's reminder
+  // depends on its own stage and the user's per-kind settings. Run it in small
+  // batches: fully sequential is a round trip per row, and firing all of them
+  // at once would put more concurrent connections through the pooler than this
+  // is worth. One row failing to schedule never fails the batch, because the
+  // date itself is already saved.
+  let scheduled = 0;
+  for (let i = 0; i < targetIds.length; i += SCHEDULE_BATCH_SIZE) {
+    const batch = targetIds.slice(i, i + SCHEDULE_BATCH_SIZE);
+    const outcomes = await Promise.allSettled(
+      batch.map((id) => syncDeadlineReminders(id)),
+    );
+    outcomes.forEach((outcome, index) => {
+      if (outcome.status === "rejected") {
+        console.error(
+          "Failed to schedule reminders for",
+          batch[index],
+          outcome.reason,
+        );
+        return;
+      }
+      scheduled +=
+        "scheduled" in outcome.value ? (outcome.value.scheduled ?? 0) : 0;
+    });
+  }
+
+  for (const id of targetIds) {
+    revalidatePath(`/dashboard/applications/${id}`);
+  }
+  revalidatePath("/dashboard");
+  return { success: true, updated: targetIds.length, scheduled };
 }
 
 export async function importApplications(

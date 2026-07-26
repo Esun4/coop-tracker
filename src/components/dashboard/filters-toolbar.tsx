@@ -8,7 +8,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Search, X } from "lucide-react";
+import { Search, X, ListChecks } from "lucide-react";
 import { applicationStatuses, statusLabels } from "@/lib/schemas";
 import type { Density } from "./application-table";
 
@@ -25,6 +25,12 @@ interface FiltersToolbarProps {
   onInPlayOnlyChange: (value: boolean) => void;
   density: Density;
   onDensityChange: (value: Density) => void;
+  /**
+   * The checkbox column only exists while this is on, so entering selection
+   * needs one control of its own — there is no checkbox to click first.
+   */
+  selectionMode: boolean;
+  onSelectionModeChange: (value: boolean) => void;
   shown: number;
   total: number;
 }
@@ -76,6 +82,8 @@ export function FiltersToolbar({
   onInPlayOnlyChange,
   density,
   onDensityChange,
+  selectionMode,
+  onSelectionModeChange,
   shown,
   total,
 }: FiltersToolbarProps) {
@@ -142,6 +150,18 @@ export function FiltersToolbar({
         <span className="text-meta text-muted-foreground">
           {shown} of {total}
         </span>
+        <button
+          onClick={() => onSelectionModeChange(!selectionMode)}
+          aria-pressed={selectionMode}
+          className={`text-micro inline-flex h-8 items-center gap-1.5 rounded-md border px-[11px] font-medium transition-colors ${
+            selectionMode
+              ? "border-primary bg-attn text-foreground"
+              : "border-border text-muted-foreground hover:bg-secondary"
+          }`}
+        >
+          <ListChecks className="size-3.5" />
+          Select
+        </button>
         <Segmented<Density>
           label="Table density"
           value={density}
