@@ -105,12 +105,17 @@ export function DashboardNav({ user }: DashboardNavProps) {
               </button>
             }
           />
-          <DropdownMenuContent align="end">
+          <DropdownMenuContent
+            align="end"
+            className="w-auto min-w-(--anchor-width) max-w-[min(20rem,calc(100vw-2rem))]"
+          >
             <div className="px-3 py-2.5 border-b">
               {user.name && (
                 <p className="text-sm font-medium">{user.name}</p>
               )}
-              <p className="text-xs text-muted-foreground">{user.email}</p>
+              <p className="text-xs text-muted-foreground break-all">
+                {user.email}
+              </p>
             </div>
             <DropdownMenuItem
               render={<Link href="/dashboard/settings" />}

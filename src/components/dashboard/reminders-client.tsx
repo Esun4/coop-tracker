@@ -147,8 +147,8 @@ export function RemindersClient({ initial }: { initial: Initial }) {
   }
 
   return (
-    <div className="grid grid-cols-[200px_1fr] gap-9">
-      <div>
+    <div className="mx-auto grid w-full max-w-[1080px] grid-cols-[200px_1fr] gap-12 2xl:max-w-none 2xl:grid-cols-[minmax(0,1fr)_820px_minmax(0,1fr)]">
+      <div className="2xl:w-[200px] 2xl:justify-self-end">
         <h1 className="font-heading text-title tracking-title mb-5 font-semibold">
           Settings
         </h1>
@@ -169,7 +169,7 @@ export function RemindersClient({ initial }: { initial: Initial }) {
         </nav>
       </div>
 
-      <div className="flex max-w-[700px] flex-col gap-4">
+      <div className="flex min-w-0 flex-col gap-4">
         <section className="bg-card border-border overflow-hidden rounded-xl border">
           <div className="flex items-start justify-between gap-5 px-[22px] pt-5 pb-4">
             <div>

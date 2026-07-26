@@ -202,9 +202,12 @@ export function SettingsClient({ initial }: { initial: Initial }) {
     });
   }
 
+  // On wide screens the card column is what sits centred in the viewport; the
+  // section nav hangs off its left in the leftover gutter. Below 2xl there is
+  // not enough room for that, so the pair falls back to a centred block.
   return (
-    <div className="grid grid-cols-[200px_1fr] gap-10">
-      <div>
+    <div className="mx-auto grid w-full max-w-[1080px] grid-cols-[200px_1fr] gap-12 2xl:max-w-none 2xl:grid-cols-[minmax(0,1fr)_820px_minmax(0,1fr)]">
+      <div className="2xl:w-[200px] 2xl:justify-self-end">
         <h1 className="font-heading text-title tracking-title mb-5 font-semibold">
           Settings
         </h1>
@@ -223,7 +226,7 @@ export function SettingsClient({ initial }: { initial: Initial }) {
         </nav>
       </div>
 
-      <div className="flex max-w-[660px] flex-col gap-4">
+      <div className="flex min-w-0 flex-col gap-4">
         <Card heading="Email sync">
           <div className="border-border-subtle flex items-center justify-between gap-5 border-b pt-4 pb-4">
             <div>
