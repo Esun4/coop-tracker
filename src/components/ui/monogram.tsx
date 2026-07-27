@@ -18,9 +18,14 @@ type MonogramSize = "sm" | "md" | "lg";
  */
 const GRAPHEMES = new Intl.Segmenter(undefined, { granularity: "grapheme" });
 
-function firstCharacter(name: string): string {
+export function firstCharacter(name: string): string {
   const [first] = GRAPHEMES.segment(name.trim());
-  return first?.segment.toUpperCase() ?? "?";
+  const upper = first?.segment.toUpperCase();
+  if (!upper) return "?";
+  // Uppercasing can lengthen a grapheme — "ß" becomes "SS" — and the box is a
+  // fixed size, so segment again and keep only the first.
+  const [upperFirst] = GRAPHEMES.segment(upper);
+  return upperFirst?.segment ?? "?";
 }
 
 const SIZE: Record<MonogramSize, string> = {
