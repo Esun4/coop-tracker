@@ -48,3 +48,5 @@ AUDIT_REPORT.md
 # Classifier eval — real email content and results, never commit
 scripts/eval-emails.json
 scripts/eval-results.json
+
+/design_handoff_ui_redesign

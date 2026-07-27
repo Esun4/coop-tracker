@@ -20,12 +20,27 @@ model User {
   googleRefreshToken String?
   lastEmailSync      DateTime?
 
+  // Which reminders are on, and how long before. Kept as JSON rather than a
+  // second table: it is a per-kind settings blob, never queried across users.
+  reminderSettings Json?
+  digestEnabled    Boolean @default(true)
+  quietHoursStart  String  @default("22:00")
+  quietHoursEnd    String  @default("08:00")
+
+  // Appearance and scanning preferences live on the account, not in
+  // localStorage: they should follow you to another machine.
+  theme          String  @default("system") // light | dark | system
+  palette        String  @default("ledger") // ledger | ink
+  density        String  @default("compact") // compact | comfortable
+  scanFrequency  String  @default("manual") // manual | every6h | daily8am
+
   accounts        Account[]
   sessions        Session[]
   applications    Application[]
   emailSuggestions EmailSuggestion[]
   activityLogs    ActivityLog[]
   rateLimitEvents RateLimitEvent[]
+  reminders       Reminder[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -98,8 +113,17 @@ model Application {
   contactInfo     String?
   archived        Boolean           @default(false)
 
+  // A date the application is working towards — an assessment due, an offer to
+  // decide on. `deadlineSource` records whether a human typed it or the
+  // classifier read it out of an email; `deadlineNote` keeps the sentence it
+  // came from, so a wrong date is traceable to its source.
+  deadlineAt     DateTime?
+  deadlineSource String?
+  deadlineNote   String?
+
   user         User          @relation(fields: [userId], references: [id], onDelete: Cascade)
   activityLogs ActivityLog[]
+  reminders    Reminder[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -184,4 +208,38 @@ model RateLimitEvent {
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId, feature, createdAt])
+}
+
+enum ReminderKind {
+  ASSESSMENT_DUE
+  OFFER_DECISION
+  INTERVIEW_TOMORROW
+  NO_REPLY
+  POSTING_CLOSES
+}
+
+// A single pending nudge. Materialised when a date lands on an application —
+// usually read out of an email — so a reminder exists without anyone typing
+// it in. `sentAt` makes delivery idempotent; a snooze pushes it forward.
+model Reminder {
+  id            String       @id @default(cuid())
+  userId        String
+  applicationId String?
+  kind          ReminderKind
+  offsetMinutes Int
+  viaEmail      Boolean      @default(true)
+  viaPush       Boolean      @default(false)
+  scheduledFor  DateTime
+  sentAt        DateTime?
+  snoozedUntil  DateTime?
+
+  user        User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  application Application? @relation(fields: [applicationId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+
+  @@index([userId])
+  @@index([applicationId])
+  // The sweep reads exactly this: unsent reminders whose time has come.
+  @@index([sentAt, scheduledFor])
 }

@@ -72,6 +72,7 @@ export async function syncGmailEmails() {
   if (!user?.googleAccessToken) {
     return {
       error: "No Google account connected. Please sign out and sign in with Google to enable Gmail sync and email replies.",
+      code: "gmail_disconnected" as const,
     };
   }
 
@@ -82,6 +83,7 @@ export async function syncGmailEmails() {
   if (!accessToken) {
     return {
       error: "Gmail credentials need to be refreshed. Please sign out and sign in with Google again to restore access and unlock email replies.",
+      code: "gmail_expired" as const,
     };
   }
 
@@ -123,6 +125,7 @@ export async function syncGmailEmails() {
     if (status === 401 || status === 403) {
       return {
         error: "Gmail access has expired. Please sign out and sign in with Google again to restore access and unlock email replies.",
+        code: "gmail_expired" as const,
       };
     }
     throw err;
@@ -131,7 +134,7 @@ export async function syncGmailEmails() {
   const messages = listResponse.data.messages ?? [];
   if (messages.length === 0) {
     await prisma.user.update({ where: { id: userId }, data: { lastEmailSync: new Date() } });
-    return { success: true, newSuggestions: 0 };
+    return { success: true, newSuggestions: 0, scanned: 0 };
   }
 
   const messageIds = messages.map((m) => m.id!).filter(Boolean);
@@ -146,7 +149,9 @@ export async function syncGmailEmails() {
 
   if (newMessages.length === 0) {
     await prisma.user.update({ where: { id: userId }, data: { lastEmailSync: new Date() } });
-    return { success: true, newSuggestions: 0 };
+    // These messages were examined, just already known — saying "0 scanned"
+    // would read as though the scan never ran.
+    return { success: true, newSuggestions: 0, scanned: messageIds.length };
   }
 
   // Fetch all message bodies in parallel
@@ -248,5 +253,5 @@ export async function syncGmailEmails() {
   await prisma.user.update({ where: { id: userId }, data: { lastEmailSync: new Date() } });
 
   revalidatePath("/dashboard");
-  return { success: true, newSuggestions };
+  return { success: true, newSuggestions, scanned: messageIds.length };
 }
