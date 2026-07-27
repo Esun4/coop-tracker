@@ -75,8 +75,24 @@ export function ReviewSuggestionsDialog({
     if (!open) return;
 
     function onKey(event: KeyboardEvent) {
+      // These are bare letters, so a modifier means the user meant a browser
+      // shortcut — ⌘A is select-all, not "accept this suggestion".
+      if (
+        event.metaKey ||
+        event.ctrlKey ||
+        event.altKey ||
+        event.shiftKey
+      ) {
+        return;
+      }
       const target = event.target as HTMLElement | null;
-      if (target && /^(INPUT|TEXTAREA|SELECT)$/.test(target.tagName)) return;
+      if (
+        target &&
+        (/^(INPUT|TEXTAREA|SELECT)$/.test(target.tagName) ||
+          target.isContentEditable)
+      ) {
+        return;
+      }
 
       const current = suggestions[cursor];
       if (!current) return;
@@ -154,12 +170,22 @@ export function ReviewSuggestionsDialog({
                   <div className="min-w-0 flex-1">
                     <p className="text-body">
                       <span className="font-semibold">{company}</span>
-                      {suggestion.suggestedAction === "NEW_APPLICATION" ? (
-                        <> — new application, </>
+                      {/* The chip finishes the sentence, so without a stage the
+                          wording has to stand on its own. */}
+                      {status ? (
+                        <>
+                          {suggestion.suggestedAction === "NEW_APPLICATION" ? (
+                            <> — new application, </>
+                          ) : (
+                            <> moves to </>
+                          )}
+                          <StageChip status={status} size="sm" />
+                        </>
+                      ) : suggestion.suggestedAction === "NEW_APPLICATION" ? (
+                        <> — new application</>
                       ) : (
-                        <> moves to </>
+                        <> — an update, but the stage isn&apos;t clear</>
                       )}
-                      {status && <StageChip status={status} size="sm" />}
                     </p>
 
                     <p className="text-meta text-muted-foreground mt-1.5 truncate">

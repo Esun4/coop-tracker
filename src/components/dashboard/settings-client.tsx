@@ -30,12 +30,15 @@ import {
 
 type Initial = Awaited<ReturnType<typeof getPreferences>>;
 
+// Reminders is its own route; the rest are cards on this page, so they scroll
+// to their own heading rather than navigating to the URL they are already on.
+// "Account" stays the page link — it is the you-are-here entry.
 const SECTIONS = [
   { label: "Account", href: "/dashboard/settings" },
-  { label: "Email sync", href: "/dashboard/settings" },
+  { label: "Email sync", href: "#email-sync" },
   { label: "Reminders", href: "/dashboard/settings/reminders" },
-  { label: "Appearance", href: "/dashboard/settings" },
-  { label: "Data & privacy", href: "/dashboard/settings" },
+  { label: "Appearance", href: "#appearance" },
+  { label: "Data & privacy", href: "#data-privacy" },
 ];
 
 function Segmented<T extends string>({
@@ -102,14 +105,19 @@ function Row({
 }
 
 function Card({
+  id,
   heading,
   children,
 }: {
+  id?: string;
   heading: string;
   children: React.ReactNode;
 }) {
   return (
-    <section className="bg-card border-border rounded-xl border px-6 py-[22px]">
+    <section
+      id={id}
+      className="bg-card border-border scroll-mt-20 rounded-xl border px-6 py-[22px]"
+    >
       <h2 className="text-lede font-semibold">{heading}</h2>
       {children}
     </section>
@@ -192,13 +200,23 @@ export function SettingsClient({ initial }: { initial: Initial }) {
     }
 
     startTransition(async () => {
-      const result = await updatePreferences(patch);
-      if (!result.error) return;
+      // updatePreferences throws rather than returning { error } on an expired
+      // session or a dropped request, the same as the theme toggle in nav.tsx.
+      // Both paths have to roll back, or the screen keeps a preference the
+      // account never stored.
+      function rollback(message: string) {
+        setPrefs(previous);
+        setTheme(previous.theme);
+        document.documentElement.dataset.palette = previous.palette;
+        toast.error(message);
+      }
 
-      setPrefs(previous);
-      setTheme(previous.theme);
-      document.documentElement.dataset.palette = previous.palette;
-      toast.error(result.error);
+      try {
+        const result = await updatePreferences(patch);
+        if (result.error) rollback(result.error);
+      } catch {
+        rollback("Could not save your preferences.");
+      }
     });
   }
 
@@ -227,7 +245,7 @@ export function SettingsClient({ initial }: { initial: Initial }) {
       </div>
 
       <div className="flex min-w-0 flex-col gap-4">
-        <Card heading="Email sync">
+        <Card id="email-sync" heading="Email sync">
           <div className="border-border-subtle flex items-center justify-between gap-5 border-b pt-4 pb-4">
             <div>
               <p className="text-body font-medium">{initial.email}</p>
@@ -235,10 +253,14 @@ export function SettingsClient({ initial }: { initial: Initial }) {
                 {initial.gmailConnected
                   ? "Read-only access"
                   : "Not connected — sign in with Google to enable scanning"}
+                {/* Rendered during SSR, so the zone is pinned — left to the
+                    runtime, the server and the browser can disagree on the
+                    day and React reports a hydration mismatch. */}
                 {initial.lastEmailSync &&
                   ` · last scan ${initial.lastEmailSync.toLocaleDateString("en-US", {
                     month: "short",
                     day: "numeric",
+                    timeZone: "UTC",
                   })}`}
               </p>
             </div>
@@ -280,7 +302,7 @@ export function SettingsClient({ initial }: { initial: Initial }) {
           </div>
         </Card>
 
-        <Card heading="Appearance">
+        <Card id="appearance" heading="Appearance">
           <Row title="Theme">
             <Segmented
               label="Theme"
@@ -342,7 +364,7 @@ export function SettingsClient({ initial }: { initial: Initial }) {
           </Row>
         </Card>
 
-        <Card heading="Data & privacy">
+        <Card id="data-privacy" heading="Data & privacy">
           <Row
             title="Export everything"
             description="Applications, activity and suggestions as CSV"

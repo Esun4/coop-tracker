@@ -23,6 +23,7 @@ export default async function DashboardPage() {
     <DashboardClient
       initial={{ applications, stats, activities, sources, suggestions }}
       initialDensity={preferences.density === "comfortable" ? "comfortable" : "compact"}
+      initialLastSyncedAt={preferences.lastEmailSync}
     />
   );
 }

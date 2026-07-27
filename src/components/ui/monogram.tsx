@@ -10,6 +10,19 @@ import { cn } from "@/lib/utils";
 
 type MonogramSize = "sm" | "md" | "lg";
 
+/**
+ * One user-perceived character, which is not the same as one code unit or even
+ * one code point: an emoji built from a ZWJ sequence, or a letter carrying a
+ * combining accent, is several of both. Hoisted because constructing a
+ * segmenter per render is wasteful in a table of these.
+ */
+const GRAPHEMES = new Intl.Segmenter(undefined, { granularity: "grapheme" });
+
+function firstCharacter(name: string): string {
+  const [first] = GRAPHEMES.segment(name.trim());
+  return first?.segment.toUpperCase() ?? "?";
+}
+
 const SIZE: Record<MonogramSize, string> = {
   sm: "size-[18px] rounded-[5px] text-[9.5px]",
   md: "size-[26px] rounded-[7px] text-micro",
@@ -34,7 +47,7 @@ export function Monogram({
         className,
       )}
     >
-      {name.trim().charAt(0).toUpperCase() || "?"}
+      {firstCharacter(name)}
     </span>
   );
 }

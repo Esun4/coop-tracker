@@ -87,6 +87,11 @@ export function ApplicationForm({
   function handleKeyDown(e: React.KeyboardEvent<HTMLFormElement>) {
     if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) {
       e.preventDefault();
+      // The Save button is disabled while saving and the browser checks the
+      // required fields on click; the keyboard path has to do both itself or
+      // it submits twice, or submits empty.
+      if (loading) return;
+      if (!e.currentTarget.reportValidity()) return;
       void submit({ addAnother: !isEditing });
     }
   }

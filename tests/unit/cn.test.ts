@@ -56,8 +56,19 @@ describe("cn — custom weight and tracking scales", () => {
     expect(cn("font-emphasis", "font-mono")).toBe("font-emphasis font-mono");
   });
 
-  it("merges custom tracking values", () => {
+  // Every entry in TRACKING, so dropping one from the list fails here rather
+  // than silently falling back to Tailwind's stock tracking at render time.
+  it.each(["label", "column", "title", "wordmark", "metric"])(
+    "keeps tracking-%s in its own group",
+    (value) => {
+      expect(cn("tracking-tight", `tracking-${value}`)).toBe(
+        `tracking-${value}`,
+      );
+      expect(cn(`tracking-${value}`, "tracking-tight")).toBe("tracking-tight");
+    },
+  );
+
+  it("merges custom tracking values against each other", () => {
     expect(cn("tracking-label", "tracking-title")).toBe("tracking-title");
-    expect(cn("tracking-title", "tracking-tight")).toBe("tracking-tight");
   });
 });

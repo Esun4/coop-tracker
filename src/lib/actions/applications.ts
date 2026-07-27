@@ -166,6 +166,9 @@ export async function getStageIntervals(): Promise<Record<string, number>> {
       FROM "Application" a
       JOIN "ActivityLog" l ON l."applicationId" = a.id
       WHERE a."userId" = ${userId}
+        -- getStats, getLadder and getSourceBreakdown all exclude archived
+        -- rows; this hint sits beside them and has to read the same history.
+        AND a.archived = false
         AND a."applicationDate" IS NOT NULL
         AND l.action = 'updated'
         AND l.details -> 'status' ->> 'to' IS NOT NULL
@@ -205,25 +208,29 @@ export async function setApplicationDeadline(
     deadlineAt = parsed;
   }
 
-  await prisma.application.update({
-    where: { id },
-    data: {
-      deadlineAt,
-      // Editing by hand takes ownership of the date away from the classifier.
-      deadlineSource: deadlineAt ? "manual" : null,
-      deadlineNote: deadlineAt ? (input.note ?? null) : null,
-    },
-  });
-
-  await prisma.activityLog.create({
-    data: {
-      userId,
-      applicationId: id,
-      action: "updated",
-      details: { deadline: deadlineAt ? deadlineAt.toISOString() : null },
-      source: ActivitySource.manual,
-    },
-  });
+  // One unit, as in bulkSetDeadline: the detail view reads its history rail
+  // out of the ledger, so a stored date with no entry beside it is a date the
+  // page cannot explain.
+  await prisma.$transaction([
+    prisma.application.update({
+      where: { id },
+      data: {
+        deadlineAt,
+        // Editing by hand takes ownership of the date away from the classifier.
+        deadlineSource: deadlineAt ? "manual" : null,
+        deadlineNote: deadlineAt ? (input.note ?? null) : null,
+      },
+    }),
+    prisma.activityLog.create({
+      data: {
+        userId,
+        applicationId: id,
+        action: "updated",
+        details: { deadline: deadlineAt ? deadlineAt.toISOString() : null },
+        source: ActivitySource.manual,
+      },
+    }),
+  ]);
 
   // A date without the nudge it implies is only half the feature — but the
   // deadline is already saved, so a scheduling failure must not read as one.

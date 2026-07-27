@@ -74,9 +74,11 @@ const PAGE_SIZE = 50;
 export function DashboardClient({
   initial,
   initialDensity = "compact",
+  initialLastSyncedAt = null,
 }: {
   initial: DashboardData;
   initialDensity?: Density;
+  initialLastSyncedAt?: Date | null;
 }) {
   const [data, setData] = useState(initial);
   const [search, setSearch] = useState("");
@@ -98,6 +100,11 @@ export function DashboardClient({
   const [showGmailDialog, setShowGmailDialog] = useState(false);
   const [showNothingFound, setShowNothingFound] = useState(false);
   const [lastScanned, setLastScanned] = useState(0);
+  // When the last scan actually landed, so the Gmail surfaces can say so
+  // instead of always claiming there has never been one.
+  const [lastSyncedAt, setLastSyncedAt] = useState<Date | null>(
+    initialLastSyncedAt,
+  );
   const [selectionMode, setSelectionMode] = useState(false);
   const [selection, setSelection] = useState<Selection>(EMPTY_SELECTION);
   const [bulkPending, setBulkPending] = useState(false);
@@ -357,6 +364,8 @@ export function DashboardClient({
     }
 
     setGmailExpired(false);
+    // The scan just succeeded, so the server has already stamped lastEmailSync.
+    setLastSyncedAt(new Date());
 
     if (result.newSuggestions === 0) {
       // The user asked for this scan, so it gets a full answer.
@@ -448,7 +457,7 @@ export function DashboardClient({
 
       {gmailExpired && (
         <GmailExpiredBanner
-          lastSyncedAt={null}
+          lastSyncedAt={lastSyncedAt}
           onReconnect={() => setShowGmailDialog(true)}
         />
       )}
@@ -468,8 +477,16 @@ export function DashboardClient({
             onInPlayOnlyChange={withPageReset(setInPlayOnly)}
             density={density}
             onDensityChange={(next) => {
+              const previous = density;
               setDensity(next);
-              void updatePreferences({ density: next });
+              // Density is cosmetic and reverts on its own next load, so a
+              // failure does not earn a toast — but it must not be swallowed
+              // as an unhandled rejection either.
+              updatePreferences({ density: next })
+                .then((result) => {
+                  if (result?.error) setDensity(previous);
+                })
+                .catch(() => setDensity(previous));
             }}
             selectionMode={selectionMode}
             onSelectionModeChange={handleSelectionModeChange}
@@ -577,14 +594,14 @@ export function DashboardClient({
       <GmailExpiredDialog
         open={showGmailDialog}
         onOpenChange={setShowGmailDialog}
-        lastSyncedAt={null}
+        lastSyncedAt={lastSyncedAt}
       />
 
       <NothingFoundDialog
         open={showNothingFound}
         onOpenChange={setShowNothingFound}
         scanned={lastScanned}
-        lastSyncedAt={null}
+        lastSyncedAt={lastSyncedAt}
         onAddManually={() => setShowAddForm(true)}
       />
     </div>

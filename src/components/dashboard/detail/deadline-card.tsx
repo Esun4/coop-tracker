@@ -48,9 +48,12 @@ export function DeadlineCard({
 
   function save(next: string | null) {
     startTransition(async () => {
+      // Saving here takes the date over by hand, and the server marks it
+      // "manual" to match. Carrying the old email sentence across would leave
+      // "Set by you." quoting mail the user just overrode.
       const result = await setApplicationDeadline(applicationId, {
         deadlineAt: next,
-        note: deadlineNote,
+        note: null,
       });
       if (result.error) {
         toast.error(result.error);
@@ -131,7 +134,12 @@ export function DeadlineCard({
                 variant="outline"
                 size="sm"
                 disabled={pending}
-                onClick={() => setEditing(false)}
+                onClick={() => {
+                  // Drop the unsaved edit, or reopening shows the abandoned
+                  // text instead of the date that is actually stored.
+                  setValue(deadlineAt ? toInputValue(deadlineAt) : "");
+                  setEditing(false);
+                }}
               >
                 Cancel
               </Button>

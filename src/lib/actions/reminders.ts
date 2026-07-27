@@ -112,11 +112,17 @@ export async function syncDeadlineReminders(applicationId: string) {
   // Only the two kinds this function owns. A silence nudge or a posting-closes
   // reminder is scheduled elsewhere and must survive a deadline edit.
   const DEADLINE_KINDS: ReminderKind[] = ["ASSESSMENT_DUE", "OFFER_DECISION"];
-  await prisma.reminder.deleteMany({
+  // Built now, run below — the clear and the replacement go in as one unit, so
+  // a failed create cannot leave the application with no reminder at all.
+  // Callers log and continue on failure, which would make that silent.
+  const clear = prisma.reminder.deleteMany({
     where: { applicationId, userId, sentAt: null, kind: { in: DEADLINE_KINDS } },
   });
 
-  if (!application.deadlineAt) return { success: true, scheduled: 0 };
+  if (!application.deadlineAt) {
+    await clear;
+    return { success: true, scheduled: 0 };
+  }
 
   const settings = resolveReminderSettings(
     (
@@ -133,6 +139,7 @@ export async function syncDeadlineReminders(applicationId: string) {
   const setting = settings[kind] ?? REMINDER_DEFAULTS[kind];
 
   if (!setting.enabled || (!setting.viaEmail && !setting.viaPush)) {
+    await clear;
     return { success: true, scheduled: 0 };
   }
 
@@ -143,20 +150,24 @@ export async function syncDeadlineReminders(applicationId: string) {
 
   // A reminder for a moment that has already passed is noise.
   if (scheduledFor.getTime() <= Date.now()) {
+    await clear;
     return { success: true, scheduled: 0 };
   }
 
-  await prisma.reminder.create({
-    data: {
-      userId,
-      applicationId,
-      kind: kind as ReminderKind,
-      offsetMinutes: setting.offsetMinutes,
-      viaEmail: setting.viaEmail,
-      viaPush: setting.viaPush,
-      scheduledFor,
-    },
-  });
+  await prisma.$transaction([
+    clear,
+    prisma.reminder.create({
+      data: {
+        userId,
+        applicationId,
+        kind: kind as ReminderKind,
+        offsetMinutes: setting.offsetMinutes,
+        viaEmail: setting.viaEmail,
+        viaPush: setting.viaPush,
+        scheduledFor,
+      },
+    }),
+  ]);
 
   return { success: true, scheduled: 1 };
 }

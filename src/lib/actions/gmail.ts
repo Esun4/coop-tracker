@@ -149,7 +149,9 @@ export async function syncGmailEmails() {
 
   if (newMessages.length === 0) {
     await prisma.user.update({ where: { id: userId }, data: { lastEmailSync: new Date() } });
-    return { success: true, newSuggestions: 0, scanned: 0 };
+    // These messages were examined, just already known — saying "0 scanned"
+    // would read as though the scan never ran.
+    return { success: true, newSuggestions: 0, scanned: messageIds.length };
   }
 
   // Fetch all message bodies in parallel
