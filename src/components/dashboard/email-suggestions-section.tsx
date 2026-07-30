@@ -26,6 +26,8 @@ import {
   X,
   Check,
   ScanText,
+  Reply,
+  Lock,
 } from "lucide-react";
 import { applicationStatuses, statusLabels } from "@/lib/schemas";
 import { StageChip } from "@/components/ui/stage-indicator";
@@ -38,11 +40,14 @@ import {
 import { toast } from "sonner";
 import type { Application, EmailSuggestion } from "@/generated/prisma/client";
 import { EmailReplyDialog } from "./email-reply-dialog";
+import { UpgradeDialog, useUpgradePrompt } from "./upgrade-dialog";
 
 interface EmailSuggestionsSectionProps {
   suggestions: EmailSuggestion[];
   applications: Application[];
   onResolved: () => void;
+  /** AI replies are Pro. Free accounts get a locked button instead. */
+  isPro: boolean;
 }
 
 const actionLabels: Record<string, string> = {
@@ -686,6 +691,7 @@ export function EmailSuggestionsSection({
   suggestions,
   applications,
   onResolved,
+  isPro,
 }: EmailSuggestionsSectionProps) {
   const [collapsed, setCollapsed] = useState(false);
   const [accepting, setAccepting] = useState<EmailSuggestion | null>(null);
@@ -694,10 +700,33 @@ export function EmailSuggestionsSection({
   const [reviewOpen, setReviewOpen] = useState(false);
   const [reviewStartIndex, setReviewStartIndex] = useState(0);
   const [replyTarget, setReplyTarget] = useState<EmailSuggestion | null>(null);
+  const upgrade = useUpgradePrompt();
 
   function openReviewAt(index: number) {
     setReviewStartIndex(index);
     setReviewOpen(true);
+  }
+
+  /**
+   * Explicit request for a reply (the row button). A free account gets the
+   * paywall — they asked for the feature, so answering with the offer is fair.
+   */
+  function requestReply(suggestion: EmailSuggestion) {
+    if (!isPro) {
+      upgrade.request("email_reply");
+      return;
+    }
+    setReplyTarget(suggestion);
+  }
+
+  /**
+   * Accepting a reply-worthy suggestion opens the composer for Pro users. For
+   * free accounts it stays silent rather than popping the paywall: an upsell
+   * fired automatically after every accept is nagging, and the locked Reply
+   * button on the row already makes the feature discoverable.
+   */
+  function offerReplyAfterAccept(suggestion: EmailSuggestion) {
+    if (isPro) setReplyTarget(suggestion);
   }
 
   if (suggestions.length === 0) return null;
@@ -839,6 +868,34 @@ export function EmailSuggestionsSection({
                         >
                           <Check className="h-4 w-4" />
                         </Button>
+                        {s.suggestedStatus &&
+                          REPLY_WORTHY.includes(s.suggestedStatus) && (
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              className="h-7 w-7 p-0 text-muted-foreground hover:text-foreground hover:bg-muted"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                requestReply(s);
+                              }}
+                              title={
+                                isPro
+                                  ? "Reply with AI"
+                                  : "Reply with AI — a Pro feature"
+                              }
+                            >
+                              {isPro ? (
+                                <Reply className="h-4 w-4" />
+                              ) : (
+                                <Lock className="h-3.5 w-3.5" />
+                              )}
+                              <span className="sr-only">
+                                {isPro
+                                  ? "Reply with AI"
+                                  : "Reply with AI — a Pro feature"}
+                              </span>
+                            </Button>
+                          )}
                         <Button
                           size="sm"
                           variant="ghost"
@@ -867,7 +924,7 @@ export function EmailSuggestionsSection({
           applications={applications}
           onClose={() => setReviewOpen(false)}
           onResolved={onResolved}
-          onAccepted={(s) => setReplyTarget(s)}
+          onAccepted={offerReplyAfterAccept}
           startIndex={reviewStartIndex}
         />
       )}
@@ -879,7 +936,7 @@ export function EmailSuggestionsSection({
           suggestion={accepting}
           onClose={() => setAccepting(null)}
           onResolved={onResolved}
-          onAccepted={(s) => setReplyTarget(s)}
+          onAccepted={offerReplyAfterAccept}
         />
       )}
 
@@ -890,7 +947,7 @@ export function EmailSuggestionsSection({
           applications={applications}
           onClose={() => setAccepting(null)}
           onResolved={onResolved}
-          onAccepted={(s) => setReplyTarget(s)}
+          onAccepted={offerReplyAfterAccept}
         />
       )}
 
@@ -902,6 +959,8 @@ export function EmailSuggestionsSection({
           onSent={() => { setReplyTarget(null); onResolved(); }}
         />
       )}
+
+      <UpgradeDialog {...upgrade.dialogProps} />
     </div>
   );
 }

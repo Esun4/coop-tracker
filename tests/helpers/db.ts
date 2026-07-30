@@ -13,9 +13,24 @@ export async function resetDb() {
 
 let userSeq = 0;
 
-/** Create a real user row in the test DB and return its id. */
+/**
+ * Create a real user row in the test DB and return its id.
+ *
+ * Defaults to the FREE plan, matching a real signup. A test that exercises a
+ * Pro-only feature has to ask for `plan: "PRO"` explicitly — if the default
+ * were PRO, a gate accidentally removed from an action would still pass every
+ * test in the suite.
+ */
 export async function createTestUser(
-  overrides: { email?: string; name?: string; googleAccessToken?: string; googleRefreshToken?: string; lastEmailSync?: Date } = {}
+  overrides: {
+    email?: string;
+    name?: string;
+    googleAccessToken?: string;
+    googleRefreshToken?: string;
+    lastEmailSync?: Date;
+    plan?: "FREE" | "PRO";
+    proUntil?: Date | null;
+  } = {}
 ) {
   userSeq += 1;
   const user = await prisma.user.create({
@@ -25,9 +40,18 @@ export async function createTestUser(
       googleAccessToken: overrides.googleAccessToken,
       googleRefreshToken: overrides.googleRefreshToken,
       lastEmailSync: overrides.lastEmailSync,
+      plan: overrides.plan ?? "FREE",
+      proUntil: overrides.proUntil ?? null,
     },
   });
   return user;
+}
+
+/** Shorthand for the common "a paying user does X" setup. */
+export async function createProTestUser(
+  overrides: Parameters<typeof createTestUser>[0] = {}
+) {
+  return createTestUser({ ...overrides, plan: "PRO" });
 }
 
 /** Insert an application directly (bypassing the server action) for a given owner. */

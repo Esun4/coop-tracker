@@ -1,11 +1,21 @@
 import { describe, it, expect, beforeEach, vi } from "vitest";
 
 // vi.mock factories are hoisted; the fns they reference must come from vi.hoisted.
-const { createMock, countMock, createEventMock } = vi.hoisted(() => ({
-  createMock: vi.fn(),
-  countMock: vi.fn(),
-  createEventMock: vi.fn(),
-}));
+const {
+  createMock,
+  countMock,
+  createEventMock,
+  findFirstEventMock,
+  findUniqueUser,
+} = vi.hoisted(
+  () => ({
+    createMock: vi.fn(),
+    countMock: vi.fn(),
+    createEventMock: vi.fn(),
+    findFirstEventMock: vi.fn(),
+    findUniqueUser: vi.fn(),
+  })
+);
 
 // Capture OpenAI call args and return a canned completion — never hits the net.
 vi.mock("openai", () => ({
@@ -14,11 +24,17 @@ vi.mock("openai", () => ({
   },
 }));
 
-// The rate-limit helper reads/writes RateLimitEvent via Prisma; mock those so
-// this stays a pure, DB-free unit test.
+// The rate-limit helper reads/writes RateLimitEvent via Prisma, and the Pro
+// gate reads the User row; mock both so this stays a pure, DB-free unit test.
 vi.mock("@/lib/prisma", () => ({
   prisma: {
-    rateLimitEvent: { count: countMock, create: createEventMock },
+    rateLimitEvent: {
+      count: countMock,
+      create: createEventMock,
+      // Read only on the blocked path, to work out when a slot frees up.
+      findFirst: findFirstEventMock,
+    },
+    user: { findUnique: findUniqueUser },
   },
 }));
 
@@ -72,6 +88,15 @@ beforeEach(() => {
   mockedAuth.mockResolvedValue({ user: { id: "user-1" } } as never);
   countMock.mockResolvedValue(0); // under the limit by default
   createEventMock.mockResolvedValue({});
+  findFirstEventMock.mockResolvedValue({ createdAt: new Date() });
+  // Tailoring is Pro. These tests are about prompt construction and response
+  // parsing, so the caller is entitled by default; the gate itself is covered
+  // in tests/auth/pro-boundary.test.ts.
+  findUniqueUser.mockResolvedValue({
+    email: "user-1@test.dev",
+    plan: "PRO",
+    proUntil: null,
+  });
 });
 
 describe("prompt builders", () => {
@@ -141,7 +166,15 @@ describe("analyzeJobForResume", () => {
 
     expect(result).toMatchObject({ success: true, data: ANALYSIS });
     expect(createMock).toHaveBeenCalledTimes(1);
-    expect(createEventMock).toHaveBeenCalledTimes(1);
+    expect(createEventMock).toHaveBeenCalledTimes(2);
+    // One allowed call spends a slot in BOTH budgets — per account and per
+    // network — so the count is 2, and each row carries exactly one subject.
+    expect(createEventMock).toHaveBeenCalledWith({
+      data: { userId: "user-1", feature: "resume_tailor" },
+    });
+    expect(createEventMock).toHaveBeenCalledWith({
+      data: { ipHash: expect.any(String), feature: "resume_tailor" },
+    });
   });
 
   it("rejects a too-short job description and never calls the model", async () => {
@@ -156,7 +189,10 @@ describe("analyzeJobForResume", () => {
 
     const result = await analyzeJobForResume({ jobDescription: JOB_DESCRIPTION });
 
-    expect(result).toMatchObject({ error: expect.stringMatching(/limit of 15/i) });
+    expect(result).toMatchObject({
+      error: expect.stringMatching(/all 6 resume steps/i),
+      retryAt: expect.any(String),
+    });
     expect(createMock).not.toHaveBeenCalled();
   });
 
@@ -228,7 +264,15 @@ describe("refineResume", () => {
       success: true,
       data: { revised: expect.stringContaining("revised second bullet") },
     });
-    expect(createEventMock).toHaveBeenCalledTimes(1);
+    expect(createEventMock).toHaveBeenCalledTimes(2);
+    // One allowed call spends a slot in BOTH budgets — per account and per
+    // network — so the count is 2, and each row carries exactly one subject.
+    expect(createEventMock).toHaveBeenCalledWith({
+      data: { userId: "user-1", feature: "resume_tailor" },
+    });
+    expect(createEventMock).toHaveBeenCalledWith({
+      data: { ipHash: expect.any(String), feature: "resume_tailor" },
+    });
 
     const userMsg = createMock.mock.calls[0][0].messages.find(
       (m: { role: string }) => m.role === "user"

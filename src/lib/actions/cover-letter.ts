@@ -8,7 +8,9 @@ import {
   type CoverLetterFormData,
   type CondenseLetterInput,
 } from "@/lib/schemas";
-import { checkRateLimit } from "@/lib/rate-limit";
+import { enforceRateLimit } from "@/lib/rate-limit";
+import { requirePro } from "@/lib/entitlements";
+import type { ProRequired } from "@/lib/pro";
 import {
   SYSTEM_PROMPT,
   buildUserPrompt,
@@ -21,12 +23,13 @@ import {
 // is a stronger writing model — see project memory.
 const MODEL = "gpt-4o-mini";
 
-const RATE_LIMIT = 10;
-const RATE_WINDOW_MS = 60 * 60 * 1000; // 1 hour
+// Budgets live in `@/lib/rate-limit` (RATE_LIMITS.cover_letter) so every cap in
+// the app is retunable from one place as the API credit balance changes.
 
 type GenerateResult =
   | { success: true; letter: string }
-  | { error: string };
+  | { error: string; proRequired?: true; retryAt?: string }
+  | ProRequired;
 
 export async function generateCoverLetter(
   input: CoverLetterFormData
@@ -37,28 +40,25 @@ export async function generateCoverLetter(
   if (!session?.user?.id) throw new Error("Unauthorized");
   const userId = session.user.id;
 
-  // 2. Validate server-side (the client button gate doesn't count here).
+  // 2. Pro gate — ahead of both validation and the rate limiter, so a free
+  //    caller neither reaches OpenAI nor burns a quota slot they can't use.
+  const gate = await requirePro(userId);
+  if (gate) return gate;
+
+  // 3. Validate server-side (the client button gate doesn't count here).
   const parsed = coverLetterSchema.safeParse(input);
   if (!parsed.success) {
     return { error: parsed.error.issues[0].message };
   }
   const { baseLetter, jobDescription } = parsed.data;
 
-  // 3. Rate limit BEFORE the paid call, so a generation counts against quota
-  //    even if the model call then fails.
-  const allowed = await checkRateLimit(
-    userId,
-    "cover_letter",
-    RATE_LIMIT,
-    RATE_WINDOW_MS
-  );
-  if (!allowed) {
-    return {
-      error: `You've reached the limit of ${RATE_LIMIT} generations per hour. Try again later.`,
-    };
-  }
+  // 4. Rate limit BEFORE the paid call, so a generation counts against quota
+  //    even if the model call then fails. Checks the per-account budget and the
+  //    per-network one; either can block.
+  const limited = await enforceRateLimit("cover_letter", userId);
+  if (limited) return limited;
 
-  // 4. The LLM call — wrapped so a model/network blip becomes a clean error
+  // 5. The LLM call — wrapped so a model/network blip becomes a clean error
   //    toast rather than an unhandled exception.
   try {
     const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
@@ -92,23 +92,17 @@ export async function condenseCoverLetter(
   if (!session?.user?.id) throw new Error("Unauthorized");
   const userId = session.user.id;
 
+  const gate = await requirePro(userId);
+  if (gate) return gate;
+
   const parsed = condenseLetterSchema.safeParse(input);
   if (!parsed.success) {
     return { error: parsed.error.issues[0].message };
   }
   const { letter, targetWords } = parsed.data;
 
-  const allowed = await checkRateLimit(
-    userId,
-    "cover_letter",
-    RATE_LIMIT,
-    RATE_WINDOW_MS
-  );
-  if (!allowed) {
-    return {
-      error: `You've reached the limit of ${RATE_LIMIT} generations per hour. Try again later.`,
-    };
-  }
+  const limited = await enforceRateLimit("cover_letter", userId);
+  if (limited) return limited;
 
   try {
     const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });

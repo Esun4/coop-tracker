@@ -19,7 +19,7 @@ export default async function DashboardLayout({
   return (
     <div className="min-h-screen flex flex-col">
       <PreferencesSync theme={preferences.theme} palette={preferences.palette} />
-      <DashboardNav user={session.user} />
+      <DashboardNav user={session.user} isPro={preferences.isPro} />
       <main className="flex-1 mx-auto px-6 lg:px-10 py-7 w-full max-w-[1720px]">
         {children}
       </main>

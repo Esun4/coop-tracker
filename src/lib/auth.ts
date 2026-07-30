@@ -4,8 +4,8 @@ import Credentials from "next-auth/providers/credentials";
 import { authConfig } from "@/lib/auth.config";
 import { CustomPrismaAdapter } from "@/lib/auth-adapter";
 import { prisma } from "@/lib/prisma";
-import bcrypt from "bcryptjs";
 import { encrypt } from "@/lib/crypto";
+import { authorizeCredentials } from "@/lib/credentials-auth";
 
 export const { handlers, auth, signIn, signOut } = NextAuth({
   ...authConfig,
@@ -29,24 +29,9 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         email: { label: "Email", type: "email" },
         password: { label: "Password", type: "password" },
       },
-      async authorize(credentials) {
-        if (!credentials?.email || !credentials?.password) return null;
-
-        const user = await prisma.user.findUnique({
-          where: { email: credentials.email as string },
-        });
-
-        if (!user?.hashedPassword) return null;
-
-        const isValid = await bcrypt.compare(
-          credentials.password as string,
-          user.hashedPassword
-        );
-
-        if (!isValid) return null;
-
-        return { id: user.id, email: user.email, name: user.name };
-      },
+      // Lives in its own module so it can be tested without booting the
+      // adapter and every provider — see src/lib/credentials-auth.ts.
+      authorize: authorizeCredentials,
     }),
   ],
   callbacks: {

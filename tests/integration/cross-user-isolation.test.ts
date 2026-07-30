@@ -35,6 +35,7 @@ import { prisma } from "@/lib/prisma";
 import {
   resetDb,
   createTestUser,
+  createProTestUser,
   createTestApplication,
   createTestSuggestion,
 } from "../helpers/db";
@@ -76,7 +77,10 @@ beforeEach(async () => {
   await resetDb();
   vi.clearAllMocks();
   owner = await createTestUser({ name: "Owner" });
-  attacker = await createTestUser({ name: "Attacker" });
+  // The attacker pays. Ownership, not the paywall, has to be what stops them —
+  // a FREE attacker would bounce off the Pro gate on the reply actions and the
+  // isolation assertions would pass for the wrong reason.
+  attacker = await createProTestUser({ name: "Attacker" });
 });
 
 describe("applications: attacker cannot touch the owner's rows", () => {
@@ -223,6 +227,9 @@ describe("suggestions: attacker cannot touch the owner's rows", () => {
     const result = await generateEmailDraft(sug.id);
     expect(result).toMatchObject({ error: "Suggestion not found" });
     expect(openaiCreateMock).not.toHaveBeenCalled();
+    // A rejected request must cost nothing: otherwise guessing ids would drain
+    // a victim's quota — and the shared per-IP budget with it.
+    expect(await prisma.rateLimitEvent.count()).toBe(0);
   });
 
   it("sendEmailReply refuses another user's suggestion and never calls Gmail", async () => {
@@ -232,6 +239,7 @@ describe("suggestions: attacker cannot touch the owner's rows", () => {
     const result = await sendEmailReply(sug.id, "I'd love to interview!");
     expect(result).toMatchObject({ error: "Suggestion not found" });
     expect(gmailSendMock).not.toHaveBeenCalled();
+    expect(await prisma.rateLimitEvent.count()).toBe(0);
   });
 });
 

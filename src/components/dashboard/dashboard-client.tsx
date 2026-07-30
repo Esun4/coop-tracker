@@ -39,6 +39,7 @@ import {
   dismissSuggestion,
 } from "@/lib/actions/suggestions";
 import { syncGmailEmails } from "@/lib/actions/gmail";
+import { rateLimitMessage, retryAtOf } from "@/lib/rate-limit-message";
 import type { Application, EmailSuggestion } from "@/generated/prisma/client";
 import { statusLabels, type ApplicationStatusType } from "@/lib/schemas";
 import { isInPlay } from "@/lib/stage";
@@ -75,10 +76,14 @@ export function DashboardClient({
   initial,
   initialDensity = "compact",
   initialLastSyncedAt = null,
+  isPro = false,
 }: {
   initial: DashboardData;
   initialDensity?: Density;
   initialLastSyncedAt?: Date | null;
+  /** Resolved on the server. Defaults to false so a missing prop locks rather
+   *  than unlocks — the safe direction for a paywall. */
+  isPro?: boolean;
 }) {
   const [data, setData] = useState(initial);
   const [search, setSearch] = useState("");
@@ -351,15 +356,19 @@ export function DashboardClient({
     const result = await syncGmailEmails();
     setIsSyncing(false);
 
-    if (result.error) {
+    // Narrow on `success` rather than on `error`: the rate-limit refusal is a
+    // named type, so TypeScript can't rule it out from a truthy `error` check
+    // alone, and every later field access would go red.
+    if (!("success" in result)) {
       // An expired token is a state, not a one-off error: it earns a banner
       // that persists, and a dialog because this scan was asked for.
-      if (result.code === "gmail_expired" || result.code === "gmail_disconnected") {
+      if ("code" in result && (result.code === "gmail_expired" || result.code === "gmail_disconnected")) {
         setGmailExpired(true);
         setShowGmailDialog(true);
         return;
       }
-      toast.error(result.error);
+      // Out of syncs → say when the next one unlocks, in the user's own clock.
+      toast.error(rateLimitMessage(result.error, retryAtOf(result)));
       return;
     }
 
@@ -584,6 +593,7 @@ export function DashboardClient({
         <EmailSuggestionsSection
           suggestions={data.suggestions}
           applications={data.applications}
+          isPro={isPro}
           onResolved={() => {
             setShowSuggestionDetail(false);
             refresh();

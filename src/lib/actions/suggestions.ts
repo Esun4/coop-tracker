@@ -9,6 +9,8 @@ import { ApplicationStatus, ActivitySource } from "@/generated/prisma/client";
 import OpenAI from "openai";
 import { google } from "googleapis";
 import { encrypt, tryDecrypt } from "@/lib/crypto";
+import { requirePro } from "@/lib/entitlements";
+import { enforceRateLimit } from "@/lib/rate-limit";
 
 const statusSchema = z.enum(applicationStatuses);
 
@@ -336,6 +338,11 @@ export async function undoEmailSuggestion(activityLogId: string) {
 export async function generateEmailDraft(suggestionId: string) {
   const userId = await getAuthUserId();
 
+  // Pro gate first, ahead of the model call — a free caller must never reach
+  // OpenAI. The client also hides the button, but this is the real boundary.
+  const gate = await requirePro(userId);
+  if (gate) return gate;
+
   const suggestion = await prisma.emailSuggestion.findFirst({
     where: { id: suggestionId, userId },
   });
@@ -345,6 +352,13 @@ export async function generateEmailDraft(suggestionId: string) {
     where: { id: userId },
     select: { name: true },
   });
+
+  // Quota is spent last, immediately before the paid call — never on a request
+  // that was going to fail anyway. A bogus or someone else's suggestion id must
+  // not be able to drain a user's budget (or their shared network's) without
+  // ever reaching OpenAI.
+  const limited = await enforceRateLimit("email_draft", userId);
+  if (limited) return limited;
 
   const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 
@@ -385,6 +399,12 @@ My name is ${user?.name ?? ""}.`,
 export async function sendEmailReply(suggestionId: string, body: string) {
   const userId = await getAuthUserId();
 
+  // Gated separately from generateEmailDraft: the two are independent entry
+  // points, and a lapsed subscription between drafting and sending should stop
+  // the send.
+  const gate = await requirePro(userId);
+  if (gate) return gate;
+
   const suggestion = await prisma.emailSuggestion.findFirst({
     where: { id: suggestionId, userId },
   });
@@ -411,6 +431,11 @@ export async function sendEmailReply(suggestionId: string, body: string) {
       error: "Gmail credentials need to be refreshed. Please sign out and sign in with Google again to restore access and unlock email replies.",
     };
   }
+
+  // Last thing before Gmail, after every cheap check that could reject this
+  // send — a missing thread id or an undecryptable token must not cost a slot.
+  const limited = await enforceRateLimit("email_send", userId);
+  if (limited) return limited;
 
   const oauth2Client = new google.auth.OAuth2(
     process.env.GOOGLE_CLIENT_ID,

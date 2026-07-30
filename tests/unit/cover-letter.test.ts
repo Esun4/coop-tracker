@@ -1,11 +1,21 @@
 import { describe, it, expect, beforeEach, vi } from "vitest";
 
 // vi.mock factories are hoisted; the fns they reference must come from vi.hoisted.
-const { createMock, countMock, createEventMock } = vi.hoisted(() => ({
-  createMock: vi.fn(),
-  countMock: vi.fn(),
-  createEventMock: vi.fn(),
-}));
+const {
+  createMock,
+  countMock,
+  createEventMock,
+  findFirstEventMock,
+  findUniqueUser,
+} = vi.hoisted(
+  () => ({
+    createMock: vi.fn(),
+    countMock: vi.fn(),
+    createEventMock: vi.fn(),
+    findFirstEventMock: vi.fn(),
+    findUniqueUser: vi.fn(),
+  })
+);
 
 // Capture OpenAI call args and return a canned completion — never hits the net.
 vi.mock("openai", () => ({
@@ -14,11 +24,17 @@ vi.mock("openai", () => ({
   },
 }));
 
-// The rate-limit helper reads/writes RateLimitEvent via Prisma; mock those so
-// this stays a pure, DB-free unit test.
+// The rate-limit helper reads/writes RateLimitEvent via Prisma, and the Pro
+// gate reads the User row; mock both so this stays a pure, DB-free unit test.
 vi.mock("@/lib/prisma", () => ({
   prisma: {
-    rateLimitEvent: { count: countMock, create: createEventMock },
+    rateLimitEvent: {
+      count: countMock,
+      create: createEventMock,
+      // Read only on the blocked path, to work out when a slot frees up.
+      findFirst: findFirstEventMock,
+    },
+    user: { findUnique: findUniqueUser },
   },
 }));
 
@@ -48,6 +64,15 @@ beforeEach(() => {
   mockedAuth.mockResolvedValue({ user: { id: "user-1" } } as never);
   countMock.mockResolvedValue(0); // under the limit by default
   createEventMock.mockResolvedValue({});
+  findFirstEventMock.mockResolvedValue({ createdAt: new Date() });
+  // Cover letters are Pro. These tests are about prompt construction and
+  // response parsing, so the caller is entitled by default; the gate itself is
+  // covered in tests/auth/pro-boundary.test.ts.
+  findUniqueUser.mockResolvedValue({
+    email: "user-1@test.dev",
+    plan: "PRO",
+    proUntil: null,
+  });
 });
 
 describe("buildUserPrompt", () => {
@@ -96,7 +121,15 @@ describe("generateCoverLetter", () => {
     expect(userMsg).toContain(JOB_DESCRIPTION);
 
     // A generation under the limit records exactly one rate-limit event.
-    expect(createEventMock).toHaveBeenCalledTimes(1);
+    expect(createEventMock).toHaveBeenCalledTimes(2);
+    // One allowed call spends a slot in BOTH budgets — per account and per
+    // network — so the count is 2, and each row carries exactly one subject.
+    expect(createEventMock).toHaveBeenCalledWith({
+      data: { userId: "user-1", feature: "cover_letter" },
+    });
+    expect(createEventMock).toHaveBeenCalledWith({
+      data: { ipHash: expect.any(String), feature: "cover_letter" },
+    });
   });
 
   it("rejects invalid input and never calls the model", async () => {
@@ -118,7 +151,12 @@ describe("generateCoverLetter", () => {
       jobDescription: JOB_DESCRIPTION,
     });
 
-    expect(result).toMatchObject({ error: expect.stringMatching(/limit of 10/i) });
+    // Copy and cap both changed with the two-budget rewrite. What the assertion
+    // is really for: the caller learns the cap AND when it frees up.
+    expect(result).toMatchObject({
+      error: expect.stringMatching(/all 5 cover letter generations/i),
+      retryAt: expect.any(String),
+    });
     expect(createMock).not.toHaveBeenCalled();
     expect(createEventMock).not.toHaveBeenCalled();
   });
@@ -176,7 +214,15 @@ describe("condenseCoverLetter", () => {
     expect(userMsg).toContain("300 words");
 
     // A condense pass spends the same rate-limit quota as a generation.
-    expect(createEventMock).toHaveBeenCalledTimes(1);
+    expect(createEventMock).toHaveBeenCalledTimes(2);
+    // One allowed call spends a slot in BOTH budgets — per account and per
+    // network — so the count is 2, and each row carries exactly one subject.
+    expect(createEventMock).toHaveBeenCalledWith({
+      data: { userId: "user-1", feature: "cover_letter" },
+    });
+    expect(createEventMock).toHaveBeenCalledWith({
+      data: { ipHash: expect.any(String), feature: "cover_letter" },
+    });
   });
 
   it("rejects an out-of-range word target and never calls the model", async () => {
@@ -198,7 +244,12 @@ describe("condenseCoverLetter", () => {
       targetWords: 300,
     });
 
-    expect(result).toMatchObject({ error: expect.stringMatching(/limit of 10/i) });
+    // Copy and cap both changed with the two-budget rewrite. What the assertion
+    // is really for: the caller learns the cap AND when it frees up.
+    expect(result).toMatchObject({
+      error: expect.stringMatching(/all 5 cover letter generations/i),
+      retryAt: expect.any(String),
+    });
     expect(createMock).not.toHaveBeenCalled();
   });
 });

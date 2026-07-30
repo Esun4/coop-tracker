@@ -9,6 +9,7 @@ import { toast } from "sonner";
 import { condenseCoverLetter } from "@/lib/actions/cover-letter";
 import { countPdfPages } from "@/lib/pdfutils";
 import { countWords, condenseTargetWords } from "@/lib/letter-format";
+import { rateLimitMessage, retryAtOf } from "@/lib/rate-limit-message";
 
 export type LetterExportPhase = "idle" | "rendering" | "condensing";
 
@@ -51,7 +52,7 @@ export function useLetterExport(
             targetWords: condenseTargetWords(countWords(current), attempt),
           });
           if ("error" in result) {
-            toast.error(result.error);
+            toast.error(rateLimitMessage(result.error, retryAtOf(result)));
             return;
           }
           current = result.letter;
