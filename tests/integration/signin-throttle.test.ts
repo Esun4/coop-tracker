@@ -1,0 +1,135 @@
+import { describe, it, expect, beforeEach, beforeAll } from "vitest";
+import bcrypt from "bcryptjs";
+
+import { prisma } from "@/lib/prisma";
+import { resetDb } from "../helpers/db";
+import {
+  authorizeCredentials,
+  RateLimitedSigninError,
+} from "@/lib/credentials-auth";
+import {
+  signInErrorMessage,
+  SIGNIN_RATE_LIMITED,
+  SIGNIN_DEFAULT_MESSAGE,
+} from "@/lib/auth-codes";
+import { RATE_LIMITS } from "@/lib/rate-limit";
+
+const PASSWORD = "correct-horse-battery-staple";
+const EMAIL = "throttle-test@example.dev";
+
+const IP_LIMIT = RATE_LIMITS.signin.ip;
+
+beforeAll(async () => {
+  await prisma.$queryRaw`SELECT 1`;
+});
+
+beforeEach(async () => {
+  await resetDb();
+  await prisma.user.create({
+    data: {
+      email: EMAIL,
+      name: "Throttle Test",
+      hashedPassword: await bcrypt.hash(PASSWORD, 10),
+    },
+  });
+});
+
+/** A request carrying a client IP, as Vercel's proxy would set it. */
+function requestFrom(ip: string): Request {
+  return new Request("https://example.test/api/auth/callback/credentials", {
+    headers: { "x-forwarded-for": ip },
+  });
+}
+
+function attempt(password: string, ip = "198.51.100.10") {
+  return authorizeCredentials({ email: EMAIL, password }, requestFrom(ip));
+}
+
+describe("credentials sign-in throttling", () => {
+  it("signs in with the right password", async () => {
+    await expect(attempt(PASSWORD)).resolves.toMatchObject({ email: EMAIL });
+  });
+
+  it("returns null — not an error — for a wrong password while under the limit", async () => {
+    await expect(attempt("wrong-password")).resolves.toBeNull();
+  });
+
+  it("throws a rate-limit error once the network's budget is spent", async () => {
+    for (let i = 0; i < IP_LIMIT; i++) {
+      await attempt("wrong-password");
+    }
+
+    // The next attempt is refused before any password check.
+    await expect(attempt("wrong-password")).rejects.toBeInstanceOf(
+      RateLimitedSigninError
+    );
+  });
+
+  it("throttles the correct password too, once the budget is spent", async () => {
+    for (let i = 0; i < IP_LIMIT; i++) {
+      await attempt("wrong-password");
+    }
+
+    // Deliberate: a valid password does not buy a way past the throttle,
+    // otherwise credential stuffing succeeds the moment it guesses right.
+    await expect(attempt(PASSWORD)).rejects.toBeInstanceOf(
+      RateLimitedSigninError
+    );
+  });
+
+  it("scopes the budget per network", async () => {
+    for (let i = 0; i < IP_LIMIT; i++) {
+      await attempt("wrong-password", "198.51.100.10");
+    }
+
+    // A different network is unaffected — one throttled office must not lock
+    // everyone else out.
+    await expect(attempt(PASSWORD, "203.0.113.55")).resolves.toMatchObject({
+      email: EMAIL,
+    });
+  });
+
+  it("counts an unknown account against the budget as well", async () => {
+    // Otherwise an attacker enumerating addresses gets unlimited attempts by
+    // using emails that do not exist.
+    for (let i = 0; i < IP_LIMIT; i++) {
+      await authorizeCredentials(
+        { email: "nobody@example.dev", password: "x" },
+        requestFrom("198.51.100.10")
+      );
+    }
+
+    await expect(attempt(PASSWORD)).rejects.toBeInstanceOf(
+      RateLimitedSigninError
+    );
+  });
+
+  it("does not spend budget on a request missing credentials", async () => {
+    for (let i = 0; i < IP_LIMIT + 5; i++) {
+      await authorizeCredentials({ email: EMAIL }, requestFrom("198.51.100.10"));
+    }
+
+    // Empty submissions never reached the limiter, so a real attempt still works.
+    await expect(attempt(PASSWORD)).resolves.toMatchObject({ email: EMAIL });
+  });
+});
+
+describe("sign-in error copy", () => {
+  it("carries a code the client can distinguish", () => {
+    expect(new RateLimitedSigninError().code).toBe(SIGNIN_RATE_LIMITED);
+  });
+
+  it("explains a throttle rather than blaming the password", () => {
+    const message = signInErrorMessage(SIGNIN_RATE_LIMITED);
+    expect(message).toMatch(/too many/i);
+    expect(message).not.toBe(SIGNIN_DEFAULT_MESSAGE);
+  });
+
+  it("falls back to the generic message for any other code", () => {
+    // The fallback must never distinguish "no such user" from "wrong password"
+    // — that turns the form into an account-existence oracle.
+    expect(signInErrorMessage("credentials")).toBe(SIGNIN_DEFAULT_MESSAGE);
+    expect(signInErrorMessage(undefined)).toBe(SIGNIN_DEFAULT_MESSAGE);
+    expect(signInErrorMessage(null)).toBe(SIGNIN_DEFAULT_MESSAGE);
+  });
+});

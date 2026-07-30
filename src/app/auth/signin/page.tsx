@@ -4,6 +4,7 @@ import { signIn } from "next-auth/react";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
+import { signInErrorMessage } from "@/lib/auth-codes";
 
 export default function SignInPage() {
   const router = useRouter();
@@ -23,7 +24,10 @@ export default function SignInPage() {
     });
 
     if (result?.error) {
-      setError("Invalid email or password");
+      // `code` distinguishes a throttled network from a wrong password. Without
+      // it, someone who has simply hit the rate limit is told their password is
+      // wrong and goes off to reset a password that was never the problem.
+      setError(signInErrorMessage(result.code));
       setLoading(false);
     } else {
       router.push("/dashboard");
