@@ -136,6 +136,50 @@ export const RATE_LIMITS = {
 export type RateLimitedFeature = keyof typeof RATE_LIMITS;
 
 /**
+ * The longest window any budget uses. Nothing older than this can affect a
+ * limiting decision, so it is the hard floor for how much history must be kept.
+ * Derived rather than hardcoded so adding a longer window can't silently make
+ * the retention policy wrong.
+ */
+const MAX_WINDOW_MS = Math.max(
+  ...Object.values(RATE_LIMITS).map((b: Budget) => b.windowMs)
+);
+
+/**
+ * How much history to keep. Well above `MAX_WINDOW_MS` on purpose: limiting
+ * only needs the last hour, but a day of history is useful for answering "did
+ * this user actually get rate limited last night?" and costs little.
+ */
+export const RETENTION_MS = 24 * HOUR_MS;
+
+/**
+ * Deletes ledger rows too old to matter. Called by the daily cron in
+ * `src/app/api/cron/prune-rate-limits/route.ts`.
+ *
+ * This is a scheduled job rather than opportunistic cleanup inside `consume()`
+ * on purpose: pruning inline would make a random unlucky request pay for a bulk
+ * delete, and would make tests non-deterministic.
+ *
+ * @param olderThanMs age above which rows are deleted; floored at
+ *                    `MAX_WINDOW_MS` so a mistaken caller can never delete
+ *                    events still inside an active window and hand someone a
+ *                    fresh budget.
+ * @returns how many rows were removed
+ */
+export async function pruneRateLimitEvents(
+  olderThanMs: number = RETENTION_MS
+): Promise<{ deleted: number }> {
+  const age = Math.max(olderThanMs, MAX_WINDOW_MS);
+  const cutoff = new Date(Date.now() - age);
+
+  const { count } = await prisma.rateLimitEvent.deleteMany({
+    where: { createdAt: { lt: cutoff } },
+  });
+
+  return { deleted: count };
+}
+
+/**
  * What a blocked call returns to the client. `retryAt` is an ISO string rather
  * than a Date because Server Action results cross the network — the client
  * parses and formats it in the viewer's own timezone.

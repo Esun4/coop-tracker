@@ -73,7 +73,11 @@ See `prisma/schema.prisma` for full schema. Application statuses: `APPLIED → O
 
 ## Environment Variables
 
-See `.env.example` — required: `DATABASE_URL`, `AUTH_SECRET`, `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, `OPENAI_API_KEY`.
+Required: `DATABASE_URL`, `AUTH_SECRET`, `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, `OPENAI_API_KEY`, `ENCRYPTION_KEY`.
+
+`CRON_SECRET` — required in production for the rate-limit prune cron. Set it on the Vercel project; Vercel Cron then sends it as `Authorization: Bearer …`. Without it the job returns 401 and never prunes.
+
+(There is no `.env.example` in the repo despite earlier references to one.)
 
 Optional: `PRO_USER_EMAILS` — comma-separated emails granted Pro regardless of
 their `plan` column (comped accounts, and how you unlock your own account while
@@ -134,6 +138,18 @@ subject: `userId` *or* `ipHash`, never both.
 
 Currently limited: cover letter, resume tailoring, email drafts, email sends,
 Gmail sync, sign-up, sign-in.
+
+**Retention.** Every allowed call inserts a row, so a daily Vercel Cron
+(`vercel.json` → `src/app/api/cron/prune-rate-limits/route.ts`) calls
+`pruneRateLimitEvents()` to drop rows older than `RETENTION_MS` (24h). The
+delete age is floored at the longest configured window, so it can never remove
+events still affecting a live budget.
+
+That cron route is a deliberate exception to "no API routes" — Vercel Cron
+invokes a URL and there is no session to authenticate, so it checks
+`Authorization: Bearer $CRON_SECRET` instead. It **fails closed** when
+`CRON_SECRET` is unset: an absent secret means nobody may call it, never
+everybody. Any future cron must follow the same shape.
 
 ## Adding New Features or Fixing Bugs
 **IMPORTANT**: When you work on a new feature or bug, ask me to create a git branch fo you first. Then I will shift to that branch and then you work on changes on that branch for the remainder of the session.
