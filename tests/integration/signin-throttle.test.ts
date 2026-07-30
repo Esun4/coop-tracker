@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, beforeAll } from "vitest";
+import { describe, it, expect, beforeEach, beforeAll, vi } from "vitest";
 import bcrypt from "bcryptjs";
 import { randomUUID } from "node:crypto";
 
@@ -121,6 +121,60 @@ describe("credentials sign-in throttling", () => {
 
     // Empty submissions never reached the limiter, so a real attempt still works.
     await expect(attempt(password)).resolves.toMatchObject({ email: EMAIL });
+  });
+});
+
+describe("account enumeration resistance", () => {
+  it("still runs a bcrypt comparison when the account does not exist", async () => {
+    const compare = vi.spyOn(bcrypt, "compare");
+
+    try {
+      await expect(
+        authorizeCredentials(
+          { email: "nobody@example.dev", password: "anything" },
+          requestFrom("198.51.100.77")
+        )
+      ).resolves.toBeNull();
+
+      // The point isn't the null — it's that the work happened. Skipping the
+      // comparison would return in microseconds and make unknown emails
+      // measurably distinguishable from wrong passwords.
+      expect(compare).toHaveBeenCalledTimes(1);
+    } finally {
+      compare.mockRestore();
+    }
+  });
+
+  it("compares against a hash with the same cost factor as a real one", async () => {
+    const compare = vi.spyOn(bcrypt, "compare");
+
+    try {
+      await authorizeCredentials(
+        { email: "nobody@example.dev", password: "anything" },
+        requestFrom("198.51.100.78")
+      );
+
+      const [, hashUsed] = compare.mock.calls[0] as [string, string];
+      const realHash = await bcrypt.hash("sample", 12);
+
+      // bcrypt.compare takes its work factor from the stored hash, so a cheaper
+      // dummy would leak the difference in timing just as plainly as skipping
+      // the comparison altogether.
+      expect(hashUsed.slice(0, 7)).toBe(realHash.slice(0, 7));
+    } finally {
+      compare.mockRestore();
+    }
+  });
+
+  it("gives the identical answer for an unknown email and a wrong password", async () => {
+    const unknown = await authorizeCredentials(
+      { email: "nobody@example.dev", password: "anything" },
+      requestFrom("198.51.100.79")
+    );
+    const wrongPassword = await attempt("definitely-not-it", "198.51.100.79");
+
+    expect(unknown).toBeNull();
+    expect(wrongPassword).toBeNull();
   });
 });
 

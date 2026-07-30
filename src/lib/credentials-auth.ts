@@ -28,6 +28,27 @@ export class RateLimitedSigninError extends CredentialsSignin {
 
 type Credentials = Partial<Record<string, unknown>>;
 
+/**
+ * A real bcrypt hash of a random throwaway string nobody holds, used to keep
+ * the work identical when no account matches.
+ *
+ * Without it, `bcrypt.compare` is skipped for an unknown email and that request
+ * returns in microseconds, while a wrong password costs a full bcrypt round.
+ * The gap is trivially measurable, which turns the login form into an account
+ * enumeration oracle — the exact leak the identical `null` return is meant to
+ * prevent.
+ *
+ * The cost factor must match what `signUp` uses (12): `compare` takes its work
+ * factor from the *stored* hash, so a cheaper dummy would leak the difference
+ * just as clearly.
+ *
+ * Safe to keep in source. It is a hash, not a credential, and even a candidate
+ * that somehow matched it can't authenticate — the `user` check below is what
+ * decides, and no account is attached to this hash.
+ */
+const NO_SUCH_USER_HASH =
+  "$2b$12$EB8wLu8fPfS9IUcWPhyUnuHd9VZLduKW2aq7QnFOsbO06zzkXW9m6";
+
 export async function authorizeCredentials(
   credentials: Credentials,
   request: Request
@@ -51,17 +72,19 @@ export async function authorizeCredentials(
     where: { email: credentials.email as string },
   });
 
-  // Same `null` for "no such account" and "wrong password", and no early return
-  // before the bcrypt compare would have run — either would let an attacker
-  // distinguish registered emails, by response body or by timing.
-  if (!user?.hashedPassword) return null;
-
+  // Every path below costs one bcrypt comparison, whether or not the account
+  // exists, so "no such account" and "wrong password" are indistinguishable by
+  // response body *and* by timing. Returning early on a missing user would make
+  // unknown emails answer far faster and hand an attacker a list of who has an
+  // account here.
   const isValid = await bcrypt.compare(
     credentials.password as string,
-    user.hashedPassword
+    user?.hashedPassword ?? NO_SUCH_USER_HASH
   );
 
-  if (!isValid) return null;
+  // Both conditions matter: a candidate that somehow matched the dummy hash
+  // still has no account behind it.
+  if (!user?.hashedPassword || !isValid) return null;
 
   return { id: user.id, email: user.email, name: user.name };
 }
