@@ -1,4 +1,5 @@
 import { describe, it, expect, beforeEach, beforeAll, afterEach } from "vitest";
+import { randomUUID } from "node:crypto";
 
 import { prisma } from "@/lib/prisma";
 import { resetDb, createTestUser } from "../helpers/db";
@@ -78,12 +79,16 @@ describe("pruneRateLimitEvents", () => {
 });
 
 describe("the prune cron route", () => {
-  const REAL_SECRET = "cron-secret-for-tests";
+  // Generated per test rather than hardcoded: no credential-shaped literal ever
+  // lands in a test file, and a value the route cannot have been written around
+  // proves it really compares against the environment variable.
+  let cronSecret: string;
   let previous: string | undefined;
 
   beforeEach(() => {
     previous = process.env.CRON_SECRET;
-    process.env.CRON_SECRET = REAL_SECRET;
+    cronSecret = `cron-test-${randomUUID()}`;
+    process.env.CRON_SECRET = cronSecret;
   });
 
   afterEach(() => {
@@ -103,7 +108,7 @@ describe("the prune cron route", () => {
     const user = await createTestUser();
     await seedEvent(user.id, RETENTION_MS + HOUR_MS);
 
-    const response = await call(`Bearer ${REAL_SECRET}`);
+    const response = await call(`Bearer ${cronSecret}`);
 
     expect(response.status).toBe(200);
     expect(await response.json()).toEqual({ deleted: 1 });

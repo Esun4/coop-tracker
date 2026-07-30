@@ -1,5 +1,6 @@
 import { describe, it, expect, beforeEach, beforeAll } from "vitest";
 import bcrypt from "bcryptjs";
+import { randomUUID } from "node:crypto";
 
 import { prisma } from "@/lib/prisma";
 import { resetDb } from "../helpers/db";
@@ -14,10 +15,14 @@ import {
 } from "@/lib/auth-codes";
 import { RATE_LIMITS } from "@/lib/rate-limit";
 
-const PASSWORD = "correct-horse-battery-staple";
 const EMAIL = "throttle-test@example.dev";
 
 const IP_LIMIT = RATE_LIMITS.signin.ip;
+
+// Generated per test rather than a literal: no password-shaped string lives in
+// the file, and a value the code cannot have been written around proves the
+// bcrypt comparison really checks what was hashed.
+let password: string;
 
 beforeAll(async () => {
   await prisma.$queryRaw`SELECT 1`;
@@ -25,11 +30,12 @@ beforeAll(async () => {
 
 beforeEach(async () => {
   await resetDb();
+  password = `pw-${randomUUID()}`;
   await prisma.user.create({
     data: {
       email: EMAIL,
       name: "Throttle Test",
-      hashedPassword: await bcrypt.hash(PASSWORD, 10),
+      hashedPassword: await bcrypt.hash(password, 10),
     },
   });
 });
@@ -41,13 +47,17 @@ function requestFrom(ip: string): Request {
   });
 }
 
-function attempt(password: string, ip = "198.51.100.10") {
-  return authorizeCredentials({ email: EMAIL, password }, requestFrom(ip));
+/** Named `candidate` so it doesn't shadow the generated `password` above. */
+function attempt(candidate: string, ip = "198.51.100.10") {
+  return authorizeCredentials(
+    { email: EMAIL, password: candidate },
+    requestFrom(ip)
+  );
 }
 
 describe("credentials sign-in throttling", () => {
   it("signs in with the right password", async () => {
-    await expect(attempt(PASSWORD)).resolves.toMatchObject({ email: EMAIL });
+    await expect(attempt(password)).resolves.toMatchObject({ email: EMAIL });
   });
 
   it("returns null — not an error — for a wrong password while under the limit", async () => {
@@ -72,7 +82,7 @@ describe("credentials sign-in throttling", () => {
 
     // Deliberate: a valid password does not buy a way past the throttle,
     // otherwise credential stuffing succeeds the moment it guesses right.
-    await expect(attempt(PASSWORD)).rejects.toBeInstanceOf(
+    await expect(attempt(password)).rejects.toBeInstanceOf(
       RateLimitedSigninError
     );
   });
@@ -84,7 +94,7 @@ describe("credentials sign-in throttling", () => {
 
     // A different network is unaffected — one throttled office must not lock
     // everyone else out.
-    await expect(attempt(PASSWORD, "203.0.113.55")).resolves.toMatchObject({
+    await expect(attempt(password, "203.0.113.55")).resolves.toMatchObject({
       email: EMAIL,
     });
   });
@@ -99,7 +109,7 @@ describe("credentials sign-in throttling", () => {
       );
     }
 
-    await expect(attempt(PASSWORD)).rejects.toBeInstanceOf(
+    await expect(attempt(password)).rejects.toBeInstanceOf(
       RateLimitedSigninError
     );
   });
@@ -110,7 +120,7 @@ describe("credentials sign-in throttling", () => {
     }
 
     // Empty submissions never reached the limiter, so a real attempt still works.
-    await expect(attempt(PASSWORD)).resolves.toMatchObject({ email: EMAIL });
+    await expect(attempt(password)).resolves.toMatchObject({ email: EMAIL });
   });
 });
 
