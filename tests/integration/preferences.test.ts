@@ -5,7 +5,7 @@ vi.mock("next/cache", () => ({ revalidatePath: vi.fn() }));
 
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
-import { resetDb, createTestUser } from "../helpers/db";
+import { resetDb, createTestUser, createProTestUser } from "../helpers/db";
 import { getPreferences, updatePreferences } from "@/lib/actions/preferences";
 
 const mockedAuth = vi.mocked(auth);
@@ -50,8 +50,11 @@ describe("preferences", () => {
     expect(prefs.density).toBe("compact");
   });
 
-  it("accepts every scan frequency — none of them is gated", async () => {
-    const user = await createTestUser();
+  // This replaces an earlier test asserting no scan frequency was gated. That
+  // assertion described the old product, not a bug in the new one: scheduled
+  // scanning is now Pro, so the correct behaviour is split in two below.
+  it("accepts every scan frequency for a Pro account", async () => {
+    const user = await createProTestUser();
     actAs(user.id);
 
     for (const frequency of ["manual", "every6h", "daily8am"]) {
@@ -59,6 +62,43 @@ describe("preferences", () => {
       expect(result).toMatchObject({ success: true });
       expect((await getPreferences()).scanFrequency).toBe(frequency);
     }
+  });
+
+  it("lets a free account pick manual but not the scheduled options", async () => {
+    const user = await createTestUser();
+    actAs(user.id);
+
+    expect(await updatePreferences({ scanFrequency: "manual" })).toMatchObject({
+      success: true,
+    });
+
+    for (const frequency of ["every6h", "daily8am"]) {
+      const result = await updatePreferences({ scanFrequency: frequency });
+      expect(result).toMatchObject({ proRequired: true });
+      // Rejected, not silently stored — a free account must not end up with a
+      // scheduled frequency sitting in its row.
+      expect((await getPreferences()).scanFrequency).toBe("manual");
+    }
+  });
+
+  it("reads a lapsed Pro account's stored schedule back as manual", async () => {
+    // Picked "every 6 hours" while paying, then the subscription ended.
+    const user = await createTestUser({
+      plan: "PRO",
+      proUntil: new Date(Date.now() - 24 * 60 * 60 * 1000),
+    });
+    await prisma.user.update({
+      where: { id: user.id },
+      data: { scanFrequency: "every6h" },
+    });
+    actAs(user.id);
+
+    // The stored choice is kept for a possible resubscribe...
+    const stored = await prisma.user.findUniqueOrThrow({ where: { id: user.id } });
+    expect(stored.scanFrequency).toBe("every6h");
+
+    // ...but what the app acts on, and shows, is manual.
+    expect((await getPreferences()).scanFrequency).toBe("manual");
   });
 
   it("rejects a value outside the vocabulary", async () => {

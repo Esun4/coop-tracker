@@ -23,23 +23,28 @@ import {
   Sun,
   Moon,
 } from "lucide-react";
+import { ProBadge } from "@/components/ui/pro-badge";
 
 interface DashboardNavProps {
   user: {
     name?: string | null;
     email?: string | null;
   };
+  /** Free accounts get a Pro badge on the gated destination. */
+  isPro?: boolean;
 }
 
 // Three destinations, not four: resume and cover letter were two near-identical
 // pages asking for the same posting, so they merge under Documents.
+// `pro` marks a destination that is entirely gated — the link still works, and
+// the page explains itself.
 const navLinks = [
-  { href: "/dashboard", label: "Applications", icon: LayoutDashboard },
-  { href: "/dashboard/analytics", label: "Insights", icon: BarChart2 },
-  { href: "/dashboard/documents", label: "Documents", icon: FileText },
+  { href: "/dashboard", label: "Applications", icon: LayoutDashboard, pro: false },
+  { href: "/dashboard/analytics", label: "Insights", icon: BarChart2, pro: false },
+  { href: "/dashboard/documents", label: "Documents", icon: FileText, pro: true },
 ];
 
-export function DashboardNav({ user }: DashboardNavProps) {
+export function DashboardNav({ user, isPro = false }: DashboardNavProps) {
   const pathname = usePathname();
 
   const initials = user.name
@@ -68,7 +73,7 @@ export function DashboardNav({ user }: DashboardNavProps) {
           </Link>
 
           <nav className="flex items-center gap-1">
-            {navLinks.map(({ href, label, icon: Icon }) => {
+            {navLinks.map(({ href, label, icon: Icon, pro }) => {
               const active = pathname === href;
               return (
                 <Link
@@ -82,6 +87,7 @@ export function DashboardNav({ user }: DashboardNavProps) {
                 >
                   <Icon className="size-3.5 opacity-60" />
                   <span className="hidden sm:block">{label}</span>
+                  {pro && !isPro && <ProBadge className="hidden sm:inline-flex" />}
                 </Link>
               );
             })}

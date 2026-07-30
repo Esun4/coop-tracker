@@ -56,6 +56,7 @@ import {
   compareResumes,
   refineResume,
 } from "@/lib/actions/resume";
+import { rateLimitMessage, retryAtOf } from "@/lib/rate-limit-message";
 import type {
   JobAnalysis,
   TailoredResume,
@@ -137,7 +138,7 @@ export function ResumeTailor() {
     try {
       const result = await analyzeJobForResume({ jobDescription });
       if ("error" in result) {
-        toast.error(result.error);
+        toast.error(rateLimitMessage(result.error, retryAtOf(result)));
         return;
       }
       setAnalysis(result.data);
@@ -154,7 +155,7 @@ export function ResumeTailor() {
     try {
       const result = await tailorResume({ resume, jobDescription, analysis, format });
       if ("error" in result) {
-        toast.error(result.error);
+        toast.error(rateLimitMessage(result.error, retryAtOf(result)));
         return;
       }
       setTailored(result.data);
@@ -178,7 +179,7 @@ export function ResumeTailor() {
         format,
       });
       if ("error" in result) {
-        toast.error(result.error);
+        toast.error(rateLimitMessage(result.error, retryAtOf(result)));
         return;
       }
       setDraft(result.data.revised);
@@ -202,7 +203,7 @@ export function ResumeTailor() {
         format,
       });
       if ("error" in result) {
-        toast.error(result.error);
+        toast.error(rateLimitMessage(result.error, retryAtOf(result)));
         return;
       }
       setComparison(result.data);

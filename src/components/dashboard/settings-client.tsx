@@ -4,7 +4,13 @@ import { useState, useTransition } from "react";
 import Link from "next/link";
 import { useTheme } from "next-themes";
 import { toast } from "sonner";
+import { Lock } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { ProBadge } from "@/components/ui/pro-badge";
+import {
+  UpgradeDialog,
+  useUpgradePrompt,
+} from "@/components/dashboard/upgrade-dialog";
 import { getPreferences, updatePreferences } from "@/lib/actions/preferences";
 import {
   DENSITIES,
@@ -22,10 +28,11 @@ import {
 /**
  * Account · Email sync · Appearance · Data & privacy.
  *
- * Scan frequency is open to everyone: no lock, no badge, no upgrade. Palette
- * offers Neutral ink for anyone who would rather have no status colour at all;
- * it swaps the ramp variables only, and stage stays readable from the tick
- * meter either way.
+ * Manual scanning is free; the two scheduled options are Pro, and they stay
+ * visible-but-locked rather than hidden, so the tier is legible instead of
+ * mysterious. Palette offers Neutral ink for anyone who would rather have no
+ * status colour at all; it swaps the ramp variables only, and stage stays
+ * readable from the tick meter either way.
  */
 
 type Initial = Awaited<ReturnType<typeof getPreferences>>;
@@ -124,39 +131,63 @@ function Card({
   );
 }
 
-/** A radio card. Used for scan frequency and palette. */
+/**
+ * A radio card. Used for scan frequency and palette.
+ *
+ * `locked` keeps the option on screen but turns it into an upgrade prompt: the
+ * radio becomes a lock, a Pro badge sits by the title, and `onSelect` is
+ * expected to open the paywall instead of saving. It is not `disabled` —
+ * a disabled button can't be clicked, and clicking is exactly how we want a
+ * free user to discover what Pro is.
+ */
 function ChoiceCard({
   selected,
   title,
   description,
   onSelect,
   swatches,
+  locked = false,
 }: {
   selected: boolean;
   title: string;
   description: string;
   onSelect: () => void;
   swatches?: string[];
+  locked?: boolean;
 }) {
   return (
     <button
       type="button"
       onClick={onSelect}
-      aria-pressed={selected}
+      aria-pressed={locked ? undefined : selected}
       className={`rounded-inline border px-4 py-[15px] text-left transition-colors ${
-        selected
+        selected && !locked
           ? "border-primary/45 bg-attn ring-attn ring-[3px]"
           : "border-border bg-card"
       }`}
     >
       <div className="flex items-center gap-2.5">
+        {locked ? (
+          <Lock
+            className="text-muted-foreground size-[15px] shrink-0"
+            aria-hidden
+          />
+        ) : (
+          <span
+            className={`size-[15px] shrink-0 rounded-full border ${
+              selected ? "border-primary border-4" : "border-border"
+            }`}
+            aria-hidden
+          />
+        )}
         <span
-          className={`size-[15px] shrink-0 rounded-full border ${
-            selected ? "border-primary border-4" : "border-border"
+          className={`text-body font-semibold ${
+            locked ? "text-muted-foreground" : ""
           }`}
-          aria-hidden
-        />
-        <span className="text-body font-semibold">{title}</span>
+        >
+          {title}
+        </span>
+        {locked && <ProBadge />}
       </div>
 
       {swatches && (
@@ -187,6 +218,7 @@ export function SettingsClient({ initial }: { initial: Initial }) {
   });
   const [, startTransition] = useTransition();
   const { setTheme } = useTheme();
+  const upgrade = useUpgradePrompt();
 
   function save(patch: Preferences) {
     // Optimistic: an appearance switch that lags feels broken. Keep the old
@@ -288,15 +320,25 @@ export function SettingsClient({ initial }: { initial: Initial }) {
               />
               <ChoiceCard
                 selected={prefs.scanFrequency === "every6h"}
+                locked={!initial.isPro}
                 title="Every 6 hours"
                 description="Four sweeps a day, so nothing sits unseen for long."
-                onSelect={() => save({ scanFrequency: "every6h" })}
+                onSelect={() =>
+                  initial.isPro
+                    ? save({ scanFrequency: "every6h" })
+                    : upgrade.request("scan_schedule")
+                }
               />
               <ChoiceCard
                 selected={prefs.scanFrequency === "daily8am"}
+                locked={!initial.isPro}
                 title="Daily at 8am"
                 description="One sweep each morning."
-                onSelect={() => save({ scanFrequency: "daily8am" })}
+                onSelect={() =>
+                  initial.isPro
+                    ? save({ scanFrequency: "daily8am" })
+                    : upgrade.request("scan_schedule")
+                }
               />
             </div>
           </div>
@@ -390,6 +432,9 @@ export function SettingsClient({ initial }: { initial: Initial }) {
           </Row>
         </Card>
       </div>
+
+      {/* Portals out, so its position in the grid is irrelevant. */}
+      <UpgradeDialog {...upgrade.dialogProps} />
     </div>
   );
 }

@@ -35,6 +35,7 @@ import { prisma } from "@/lib/prisma";
 import {
   resetDb,
   createTestUser,
+  createProTestUser,
   createTestApplication,
   createTestSuggestion,
 } from "../helpers/db";
@@ -76,7 +77,10 @@ beforeEach(async () => {
   await resetDb();
   vi.clearAllMocks();
   owner = await createTestUser({ name: "Owner" });
-  attacker = await createTestUser({ name: "Attacker" });
+  // The attacker pays. Ownership, not the paywall, has to be what stops them —
+  // a FREE attacker would bounce off the Pro gate on the reply actions and the
+  // isolation assertions would pass for the wrong reason.
+  attacker = await createProTestUser({ name: "Attacker" });
 });
 
 describe("applications: attacker cannot touch the owner's rows", () => {

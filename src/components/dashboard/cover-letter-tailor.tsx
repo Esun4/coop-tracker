@@ -23,6 +23,7 @@ import {
 import { toast } from "sonner";
 import { PdfUpload } from "@/components/pdf_upload/pdfupload";
 import { generateCoverLetter } from "@/lib/actions/cover-letter";
+import { rateLimitMessage, retryAtOf } from "@/lib/rate-limit-message";
 import { useLetterExport } from "@/hooks/use-letter-export";
 
 export function CoverLetterTailor() {
@@ -45,7 +46,7 @@ export function CoverLetterTailor() {
     try {
       const result = await generateCoverLetter({ baseLetter, jobDescription });
       if ("error" in result) {
-        toast.error(result.error);
+        toast.error(rateLimitMessage(result.error, retryAtOf(result)));
         return;
       }
       setResult(result.letter);

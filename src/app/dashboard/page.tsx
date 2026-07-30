@@ -24,6 +24,7 @@ export default async function DashboardPage() {
       initial={{ applications, stats, activities, sources, suggestions }}
       initialDensity={preferences.density === "comfortable" ? "comfortable" : "compact"}
       initialLastSyncedAt={preferences.lastEmailSync}
+      isPro={preferences.isPro}
     />
   );
 }

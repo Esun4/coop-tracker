@@ -3,6 +3,7 @@
 import { prisma } from "@/lib/prisma";
 import bcrypt from "bcryptjs";
 import { z } from "zod";
+import { enforceRateLimit } from "@/lib/rate-limit";
 
 const signUpSchema = z.object({
   name: z.string().min(1, "Name is required"),
@@ -22,6 +23,14 @@ export async function signUp(formData: FormData) {
   }
 
   const { name, email, password } = parsed.data;
+
+  // There is no account to key a budget on yet, so the caller's network is the
+  // only handle we have. This caps account farming, and — because the check
+  // runs before the lookup below — also throttles using this endpoint as an
+  // email-enumeration oracle ("already exists" tells an attacker who has an
+  // account here).
+  const limited = await enforceRateLimit("signup");
+  if (limited) return limited;
 
   const existing = await prisma.user.findUnique({ where: { email } });
   if (existing) {

@@ -2,10 +2,20 @@ import { describe, it, expect, beforeEach, vi } from "vitest";
 
 // vi.mock factories are hoisted above the module body, so the mock fns they
 // reference must be created via vi.hoisted (which runs first too).
-const { createMock, findFirstSuggestion, findUniqueUser } = vi.hoisted(() => ({
+const {
+  createMock,
+  findFirstSuggestion,
+  findUniqueUser,
+  countEventMock,
+  createEventMock,
+  findFirstEventMock,
+} = vi.hoisted(() => ({
   createMock: vi.fn(),
   findFirstSuggestion: vi.fn(),
   findUniqueUser: vi.fn(),
+  countEventMock: vi.fn(),
+  createEventMock: vi.fn(),
+  findFirstEventMock: vi.fn(),
 }));
 
 // Capture the args every OpenAI call receives, and return a canned completion.
@@ -17,12 +27,19 @@ vi.mock("openai", () => ({
   },
 }));
 
-// generateEmailDraft reads the suggestion + user from Prisma; mock those so this
-// stays a pure, DB-free unit test.
+// generateEmailDraft reads the suggestion + user from Prisma, and the rate
+// limiter reads/writes the RateLimitEvent ledger; mock those so this stays a
+// pure, DB-free unit test.
 vi.mock("@/lib/prisma", () => ({
   prisma: {
     emailSuggestion: { findFirst: findFirstSuggestion },
     user: { findUnique: findUniqueUser },
+    rateLimitEvent: {
+      count: countEventMock,
+      create: createEventMock,
+      // Read only on the blocked path, to work out when a slot frees up.
+      findFirst: findFirstEventMock,
+    },
   },
 }));
 
@@ -37,6 +54,19 @@ const mockedAuth = vi.mocked(auth);
 beforeEach(() => {
   vi.clearAllMocks();
   mockedAuth.mockResolvedValue({ user: { id: "user-1" } } as never);
+  countEventMock.mockResolvedValue(0); // under the limit by default
+  createEventMock.mockResolvedValue({});
+  findFirstEventMock.mockResolvedValue({ createdAt: new Date() });
+  // generateEmailDraft reads the User row twice — once for the Pro gate, once
+  // for the signer's name — through the same mock. One object satisfying both
+  // selects keeps that an implementation detail. AI replies are Pro, so the
+  // caller is entitled here; the gate is covered in tests/auth/pro-boundary.
+  findUniqueUser.mockResolvedValue({
+    name: "Ethan",
+    email: "user-1@test.dev",
+    plan: "PRO",
+    proUntil: null,
+  });
 });
 
 describe("generateEmailDraft", () => {
@@ -51,7 +81,6 @@ describe("generateEmailDraft", () => {
       suggestedAction: "STATUS_UPDATE",
       suggestedStatus: "INTERVIEW",
     });
-    findUniqueUser.mockResolvedValue({ name: "Ethan" });
     createMock.mockResolvedValue({
       choices: [{ message: { content: "Thank you for the invitation. I am excited to interview." } }],
     });

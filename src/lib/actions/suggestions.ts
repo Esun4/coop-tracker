@@ -9,6 +9,8 @@ import { ApplicationStatus, ActivitySource } from "@/generated/prisma/client";
 import OpenAI from "openai";
 import { google } from "googleapis";
 import { encrypt, tryDecrypt } from "@/lib/crypto";
+import { requirePro } from "@/lib/entitlements";
+import { enforceRateLimit } from "@/lib/rate-limit";
 
 const statusSchema = z.enum(applicationStatuses);
 
@@ -336,6 +338,16 @@ export async function undoEmailSuggestion(activityLogId: string) {
 export async function generateEmailDraft(suggestionId: string) {
   const userId = await getAuthUserId();
 
+  // Pro gate first, ahead of the model call — a free caller must never reach
+  // OpenAI. The client also hides the button, but this is the real boundary.
+  const gate = await requirePro(userId);
+  if (gate) return gate;
+
+  // Ahead of the model call for the same reason as the Pro gate: a blocked
+  // caller must not reach OpenAI.
+  const limited = await enforceRateLimit("email_draft", userId);
+  if (limited) return limited;
+
   const suggestion = await prisma.emailSuggestion.findFirst({
     where: { id: suggestionId, userId },
   });
@@ -384,6 +396,15 @@ My name is ${user?.name ?? ""}.`,
 
 export async function sendEmailReply(suggestionId: string, body: string) {
   const userId = await getAuthUserId();
+
+  // Gated separately from generateEmailDraft: the two are independent entry
+  // points, and a lapsed subscription between drafting and sending should stop
+  // the send.
+  const gate = await requirePro(userId);
+  if (gate) return gate;
+
+  const limited = await enforceRateLimit("email_send", userId);
+  if (limited) return limited;
 
   const suggestion = await prisma.emailSuggestion.findFirst({
     where: { id: suggestionId, userId },

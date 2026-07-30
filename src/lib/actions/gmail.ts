@@ -9,6 +9,7 @@ import { revalidatePath } from "next/cache";
 import { ApplicationStatus, SuggestedAction } from "@/generated/prisma/client";
 import { encrypt, tryDecrypt } from "@/lib/crypto";
 import { extractCompanyFromSender } from "@/lib/email-parsing";
+import { enforceRateLimit } from "@/lib/rate-limit";
 import pLimit from "p-limit";
 
 async function getAuthUserId(): Promise<string> {
@@ -86,6 +87,16 @@ export async function syncGmailEmails() {
       code: "gmail_expired" as const,
     };
   }
+
+  // Quota check sits here, not at the top: every early return above is a
+  // request that never reached Gmail or OpenAI, and burning one of only two
+  // hourly syncs on a 5-minute-cooldown message or a disconnected account would
+  // be punishing the user for the app's own guard rails.
+  //
+  // The cooldown above and this budget do different jobs — the cooldown stops
+  // double-click hammering, this caps hourly cost — so both stay.
+  const limited = await enforceRateLimit("gmail_sync", userId);
+  if (limited) return limited;
 
   const oauth2Client = new google.auth.OAuth2(
     process.env.GOOGLE_CLIENT_ID,

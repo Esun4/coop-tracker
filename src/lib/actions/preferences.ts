@@ -3,7 +3,13 @@
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { revalidatePath } from "next/cache";
-import { preferencesSchema } from "@/lib/preferences";
+import {
+  preferencesSchema,
+  effectiveScanFrequency,
+  isProScanFrequency,
+} from "@/lib/preferences";
+import { isPro as computeIsPro } from "@/lib/entitlements";
+import { PRO_REQUIRED_MESSAGE } from "@/lib/pro";
 
 /**
  * Appearance and scanning preferences.
@@ -11,6 +17,11 @@ import { preferencesSchema } from "@/lib/preferences";
  * These live on the User row rather than in localStorage so they follow the
  * account to another machine, and so the server can render the right theme on
  * the first paint instead of flashing the wrong one.
+ *
+ * `getPreferences` doubles as the entitlement read for the dashboard: the
+ * layout, the applications page and settings all call it already, so returning
+ * `isPro` from the same row costs nothing extra and saves every one of those
+ * screens a second query.
  */
 
 async function getAuthUserId(): Promise<string> {
@@ -31,18 +42,25 @@ export async function getPreferences() {
       email: true,
       lastEmailSync: true,
       googleAccessToken: true,
+      plan: true,
+      proUntil: true,
     },
   });
   if (!user) throw new Error("Unauthorized");
+
+  const isPro = computeIsPro(user);
 
   return {
     theme: user.theme,
     palette: user.palette,
     density: user.density,
-    scanFrequency: user.scanFrequency,
+    // The effective value, not the stored one: a lapsed account should see
+    // "Manual" selected, because manual is what is actually happening.
+    scanFrequency: effectiveScanFrequency(user.scanFrequency, isPro),
     email: user.email,
     lastEmailSync: user.lastEmailSync,
     gmailConnected: !!user.googleAccessToken,
+    isPro,
   };
 }
 
@@ -55,6 +73,21 @@ export async function updatePreferences(input: unknown) {
   }
   if (Object.keys(parsed.data).length === 0) {
     return { error: "Nothing to update" };
+  }
+
+  // Scheduled scanning is Pro. The client hides the option, but a Server Action
+  // is directly invocable, so this check is the one that counts. Only pay for
+  // the entitlement read when the patch actually asks for a gated value —
+  // a theme switch shouldn't cost a second query.
+  if (parsed.data.scanFrequency && isProScanFrequency(parsed.data.scanFrequency)) {
+    const user = await prisma.user.findUnique({
+      where: { id: userId },
+      select: { email: true, plan: true, proUntil: true },
+    });
+    if (!user) throw new Error("Unauthorized");
+    if (!computeIsPro(user)) {
+      return { error: PRO_REQUIRED_MESSAGE, proRequired: true as const };
+    }
   }
 
   await prisma.user.update({ where: { id: userId }, data: parsed.data });

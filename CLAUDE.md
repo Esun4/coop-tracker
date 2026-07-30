@@ -73,6 +73,66 @@ See `prisma/schema.prisma` for full schema. Application statuses: `APPLIED → O
 
 See `.env.example` — required: `DATABASE_URL`, `AUTH_SECRET`, `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, `OPENAI_API_KEY`.
 
+Optional: `PRO_USER_EMAILS` — comma-separated emails granted Pro regardless of
+their `plan` column (comped accounts, and how you unlock your own account while
+Stripe checkout doesn't exist yet). Matched case-insensitively.
+
+## Pro entitlements (paywall)
+
+Pro status lives on `User`: `plan` (`FREE`/`PRO`), `proUntil` (null = perpetual,
+a date = access ends then), plus `stripeCustomerId` / `stripeSubscriptionId` for
+the billing integration that isn't built yet.
+
+- `src/lib/entitlements.ts` — **server only** (imports Prisma). `isPro(user)` is
+  the pure rule; `requirePro(userId)` is the gate every Pro action calls.
+- `src/lib/pro.ts` — client-safe feature names and copy. Import this from client
+  components, never `entitlements.ts`.
+- Entitlement is read from the **database**, never the JWT — a token snapshot
+  would keep a new subscriber locked out until their next refresh.
+
+**Rules when adding a Pro feature:**
+
+1. Gate the Server Action with `requirePro` *before* any OpenAI/Gmail call and
+   before the rate limiter, and return the failure object rather than throwing —
+   the client keys off `proRequired` to open the upgrade dialog.
+2. Client-side locks are cosmetic. A Server Action is directly invocable, so the
+   server gate is the only real boundary.
+3. Add the free-tier case to `tests/integration/pro-gate.test.ts`, asserting both
+   the refusal and that the mocked provider was never called.
+
+Currently gated: AI email replies, scheduled scan frequencies, resume + cover
+letter tailoring.
+
+## Rate limiting
+
+Two budgets per feature, both backed by the `RateLimitEvent` ledger: **per user**
+(the cost control — survives IP changes) and **per IP** (the abuse backstop, and
+the only option on signed-out endpoints). A ledger row carries exactly one
+subject: `userId` *or* `ipHash`, never both.
+
+- `src/lib/rate-limit.ts` — **server only**. `RATE_LIMITS` holds every budget in
+  the app; retune caps there, never at a call site. `enforceRateLimit(feature,
+  userId?)` is the single entry point — returns `null` to proceed, or a
+  `{ error, retryAt }` object to return straight to the client.
+- `src/lib/client-ip.ts` — **server only**. Header trust order, IPv6 → /64
+  bucketing, and HMAC-with-`AUTH_SECRET`. Raw IPs are never stored.
+- `src/lib/rate-limit-message.ts` — client-safe. `rateLimitMessage(error,
+  retryAt)` appends "You can try again at 3:42 PM" in the *viewer's* timezone.
+
+**Rules when adding a rate-limited feature:**
+
+1. Add the budget to `RATE_LIMITS` and call `enforceRateLimit` *after* auth and
+   the Pro gate but *before* any OpenAI/Gmail call — and after any cheap early
+   return (a cooldown message, a missing token), so the app's own guard rails
+   never spend a user's quota.
+2. Server Actions return `retryAt` as an ISO string; format it in the browser.
+   Never format a time server-side — Vercel runs in UTC.
+3. The per-user check runs first by design. Both checks record, so checking IP
+   first would let an over-quota user drain their whole network's budget.
+
+Currently limited: cover letter, resume tailoring, email drafts, email sends,
+Gmail sync, sign-up, sign-in.
+
 ## Adding New Features or Fixing Bugs
 **IMPORTANT**: When you work on a new feature or bug, ask me to create a git branch fo you first. Then I will shift to that branch and then you work on changes on that branch for the remainder of the session.
 

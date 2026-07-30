@@ -9,12 +9,29 @@ datasource db {
 
 // ─── Auth (NextAuth) ────────────────────────────────────────
 
+// Billing tier. Deliberately an enum rather than a boolean: a third tier later
+// is a migration, not a rewrite of every call site.
+enum PlanTier {
+  FREE
+  PRO
+}
+
 model User {
   id             String    @id @default(cuid())
   name           String?
   email          String    @unique
   emailVerified  DateTime?
   hashedPassword String?
+
+  // Entitlement. `proUntil` null means perpetual (a comped or lifetime
+  // account); a date means access ends then, which is what a cancelled
+  // Stripe subscription sets so the user keeps what they paid for until the
+  // period closes. The Stripe ids are unique so a webhook can look a user up
+  // by them without scanning.
+  plan                 PlanTier  @default(FREE)
+  proUntil             DateTime?
+  stripeCustomerId     String?   @unique
+  stripeSubscriptionId String?   @unique
 
   googleAccessToken  String?
   googleRefreshToken String?
@@ -32,7 +49,9 @@ model User {
   theme          String  @default("system") // light | dark | system
   palette        String  @default("ledger") // ledger | ink
   density        String  @default("compact") // compact | comfortable
-  scanFrequency  String  @default("manual") // manual | every6h | daily8am
+  // manual | every6h | daily8am — the scheduled options are Pro-only, and a
+  // lapsed account reads back as "manual" rather than being rewritten here.
+  scanFrequency  String  @default("manual")
 
   accounts        Account[]
   sessions        Session[]
@@ -199,15 +218,27 @@ model ActivityLog {
 // generated content — only that a rate-limited action ran. Reused across
 // features via the `feature` discriminator (e.g. "cover_letter", later
 // "resume_tailor"), each getting its own independent budget.
+//
+// A row is keyed by EXACTLY ONE subject: a signed-in user (`userId`) or a
+// caller's network address (`ipHash`). Both are nullable so the two budgets can
+// share one table and one query path; the "exactly one" rule is enforced in
+// `src/lib/rate-limit.ts`, not by the DB, since Prisma can't express a check
+// constraint. Keeping `userId` a real FK (rather than collapsing both into a
+// generic subject string) means deleting a user still cascades their events
+// away instead of leaving orphans.
+//
+// `ipHash` is an HMAC, never a raw address — see `src/lib/client-ip.ts`.
 model RateLimitEvent {
   id        String   @id @default(cuid())
-  userId    String
+  userId    String?
+  ipHash    String?
   feature   String
   createdAt DateTime @default(now())
 
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user User? @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId, feature, createdAt])
+  @@index([ipHash, feature, createdAt])
 }
 
 enum ReminderKind {

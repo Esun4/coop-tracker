@@ -12,6 +12,7 @@ import {
 } from "@/components/ui/dialog";
 import { toast } from "sonner";
 import { generateEmailDraft, sendEmailReply } from "@/lib/actions/suggestions";
+import { rateLimitMessage, retryAtOf } from "@/lib/rate-limit-message";
 import type { EmailSuggestion } from "@/generated/prisma/client";
 
 interface EmailReplyDialogProps {
@@ -35,7 +36,11 @@ export function EmailReplyDialog({
   useEffect(() => {
     generateEmailDraft(suggestion.id).then((result) => {
       if ("error" in result) {
-        setDraftError(result.error ?? "Failed to generate draft");
+        setDraftError(
+          result.error
+            ? rateLimitMessage(result.error, retryAtOf(result))
+            : "Failed to generate draft"
+        );
       } else {
         setDraftText(result.draft);
         setEditedText(result.draft);
@@ -48,7 +53,7 @@ export function EmailReplyDialog({
     setPhase("sending");
     const result = await sendEmailReply(suggestion.id, editedText);
     if ("error" in result && result.error) {
-      toast.error(result.error);
+      toast.error(rateLimitMessage(result.error, retryAtOf(result)));
       setPhase(draftText !== editedText ? "editing" : "preview");
       return;
     }

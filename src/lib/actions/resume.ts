@@ -13,7 +13,8 @@ import {
   type ResumeCompareInput,
   type ResumeRefineInput,
 } from "@/lib/schemas";
-import { checkRateLimit } from "@/lib/rate-limit";
+import { enforceRateLimit } from "@/lib/rate-limit";
+import { requirePro } from "@/lib/entitlements";
 import {
   ANALYZE_SYSTEM_PROMPT,
   buildAnalyzePrompt,
@@ -38,16 +39,22 @@ import {
 // contract.
 const MODEL = "gpt-4o-mini";
 
-// One tailoring session is up to 3 calls (analyze → tailor → compare), so the
-// bucket is sized for ~5 full sessions an hour, separate from cover letters.
-const RATE_LIMIT = 15;
-const RATE_WINDOW_MS = 60 * 60 * 1000; // 1 hour
+// Budget lives in `@/lib/rate-limit` (RATE_LIMITS.resume_tailor). Note that one
+// tailoring session is up to 3 calls (analyze → tailor → compare) and every one
+// of them spends from that bucket.
 
-type ActionResult<T> = { success: true; data: T } | { error: string };
+type ActionResult<T> =
+  | { success: true; data: T }
+  | { error: string; proRequired?: true; retryAt?: string };
 
 // Shared plumbing for one JSON-mode model call: auth is already checked by the
-// caller; this validates quota, calls the model, and Zod-validates the reply
-// so a malformed model response becomes a clean error, never a broken page.
+// caller; this checks entitlement and quota, calls the model, and Zod-validates
+// the reply so a malformed model response becomes a clean error, never a broken
+// page.
+//
+// Tailoring is Pro-only, and the gate lives here rather than in each of the
+// four actions: every one of them ends in this function, so a step added later
+// is gated by construction instead of by remembering.
 async function runJsonStep<T>(
   userId: string,
   systemPrompt: string,
@@ -55,17 +62,11 @@ async function runJsonStep<T>(
   responseSchema: z.ZodType<T>,
   failureMessage: string
 ): Promise<ActionResult<T>> {
-  const allowed = await checkRateLimit(
-    userId,
-    "resume_tailor",
-    RATE_LIMIT,
-    RATE_WINDOW_MS
-  );
-  if (!allowed) {
-    return {
-      error: `You've reached the limit of ${RATE_LIMIT} resume steps per hour. Try again later.`,
-    };
-  }
+  const gate = await requirePro(userId);
+  if (gate) return gate;
+
+  const limited = await enforceRateLimit("resume_tailor", userId);
+  if (limited) return limited;
 
   try {
     const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });

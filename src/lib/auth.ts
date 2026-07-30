@@ -6,6 +6,7 @@ import { CustomPrismaAdapter } from "@/lib/auth-adapter";
 import { prisma } from "@/lib/prisma";
 import bcrypt from "bcryptjs";
 import { encrypt } from "@/lib/crypto";
+import { enforceRateLimit } from "@/lib/rate-limit";
 
 export const { handlers, auth, signIn, signOut } = NextAuth({
   ...authConfig,
@@ -29,8 +30,26 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         email: { label: "Email", type: "email" },
         password: { label: "Password", type: "password" },
       },
-      async authorize(credentials) {
+      async authorize(credentials, request) {
         if (!credentials?.email || !credentials?.password) return null;
+
+        // Throttle by network before touching the password hash. This is what
+        // makes credential stuffing expensive: without it, an attacker can test
+        // passwords as fast as bcrypt will answer.
+        //
+        // Every attempt counts, not just failures — simpler, and 10 per 15
+        // minutes never inconveniences a real person.
+        //
+        // Known rough edge: `authorize` can only say yes or no, so a throttled
+        // user sees the generic "invalid credentials" message rather than
+        // "too many attempts". Surfacing the real reason needs a custom
+        // CredentialsSignin error class; worth doing if it ever bites someone.
+        const limited = await enforceRateLimit(
+          "signin",
+          undefined,
+          request.headers
+        );
+        if (limited) return null;
 
         const user = await prisma.user.findUnique({
           where: { email: credentials.email as string },

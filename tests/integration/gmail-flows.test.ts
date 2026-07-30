@@ -51,7 +51,12 @@ vi.mock("googleapis", () => ({
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { encrypt } from "@/lib/crypto";
-import { resetDb, createTestUser, createTestSuggestion } from "../helpers/db";
+import {
+  resetDb,
+  createTestUser,
+  createProTestUser,
+  createTestSuggestion,
+} from "../helpers/db";
 import { syncGmailEmails } from "@/lib/actions/gmail";
 import { sendEmailReply } from "@/lib/actions/suggestions";
 
@@ -218,7 +223,9 @@ describe("Gmail token handling — tokens must never leak", () => {
   });
 
   it("sendEmailReply 403 yields a re-auth message with no token in it", async () => {
-    const user = await createTestUser({
+    // Replies are Pro-gated ahead of the Gmail call, so the token-handling
+    // behaviour under test is only reachable for a paying account.
+    const user = await createProTestUser({
       googleAccessToken: encrypt(PLAINTEXT_ACCESS),
       googleRefreshToken: encrypt(PLAINTEXT_REFRESH),
     });
@@ -235,7 +242,7 @@ describe("Gmail token handling — tokens must never leak", () => {
   });
 
   it("the decrypted token is passed to the OAuth client but never surfaced to the caller", async () => {
-    const user = await createTestUser({
+    const user = await createProTestUser({
       googleAccessToken: encrypt(PLAINTEXT_ACCESS),
       googleRefreshToken: encrypt(PLAINTEXT_REFRESH),
     });
@@ -259,7 +266,7 @@ describe("Gmail token handling — tokens must never leak", () => {
 
 describe("sendEmailReply — happy path and guards", () => {
   it("sends a reply on the original thread and records replySentAt", async () => {
-    const user = await createTestUser({
+    const user = await createProTestUser({
       name: "Ethan",
       googleAccessToken: encrypt(PLAINTEXT_ACCESS),
     });
@@ -287,7 +294,7 @@ describe("sendEmailReply — happy path and guards", () => {
   });
 
   it("refuses to send when the suggestion has no thread id", async () => {
-    const user = await createTestUser({ googleAccessToken: encrypt(PLAINTEXT_ACCESS) });
+    const user = await createProTestUser({ googleAccessToken: encrypt(PLAINTEXT_ACCESS) });
     actAs(user.id);
     const sug = await createTestSuggestion(user.id, { emailThreadId: null });
 
@@ -298,7 +305,7 @@ describe("sendEmailReply — happy path and guards", () => {
 
   it("reports a friendly error when the stored token can't be decrypted", async () => {
     // Store a non-decryptable value (simulates a legacy plaintext token).
-    const user = await createTestUser({ googleAccessToken: "legacy-plaintext-token" });
+    const user = await createProTestUser({ googleAccessToken: "legacy-plaintext-token" });
     actAs(user.id);
     const sug = await createTestSuggestion(user.id);
 
