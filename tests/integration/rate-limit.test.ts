@@ -122,6 +122,29 @@ describe("checkIpRateLimit (per network)", () => {
   });
 });
 
+describe("the exactly-one-subject invariant", () => {
+  // The TypeScript union makes these unrepresentable through consume(), so
+  // these go straight to Prisma — the point is that a write path bypassing the
+  // limiter (a seed, a script, a future migration) still can't corrupt the
+  // ledger's shape. A row with both subjects would be counted against two
+  // budgets; a row with neither would be counted against none.
+  it("rejects a row carrying both a user and an IP", async () => {
+    const user = await createTestUser();
+
+    await expect(
+      prisma.rateLimitEvent.create({
+        data: { userId: user.id, ipHash: IP_A, feature: "cover_letter" },
+      })
+    ).rejects.toThrow();
+  });
+
+  it("rejects a row carrying neither", async () => {
+    await expect(
+      prisma.rateLimitEvent.create({ data: { feature: "cover_letter" } })
+    ).rejects.toThrow();
+  });
+});
+
 describe("retryAt", () => {
   it("points at when the oldest event leaves the window, not a full window from now", async () => {
     const user = await createTestUser();

@@ -46,7 +46,9 @@ npx prisma migrate dev --name <name>     # Create and apply migration
 2. `npx prisma migrate dev --name <change>` — generates a migration file *and* applies it.
 3. Commit the new `prisma/migrations/<...>` folder **together with** the schema change.
 
-- **Never** use `prisma db push` or hand-written SQL against the real (Supabase) DB — that changes the DB without a migration file and causes drift. (`db push` is only correct against the disposable test container in `scripts/setup-test-db.mjs`.)
+- **Never** use `prisma db push` or hand-written SQL against the real (Supabase) DB — that changes the DB without a migration file and causes drift.
+- **Some DDL can only live in a migration.** `schema.prisma` can't express CHECK constraints, partial indexes, or triggers, so those are hand-written SQL inside a migration file (see `20260730010000_rate_limit_one_subject`). That's the sanctioned path — it still produces a migration file, so there's no drift. When you add one, document it in a comment on the model it constrains, since the schema alone won't reveal it.
+- `scripts/setup-test-db.mjs` provisions the test DB by **replaying migrations** (`migrate deploy` onto a freshly dropped schema), not `db push`. `db push` derives DDL from `schema.prisma` and would silently omit any raw-SQL constraint, leaving tests running against a laxer database than production.
 - **Shadow database (required):** `migrate dev` needs a throwaway DB to validate migrations, and the Supabase pooler blocks auto-creating one. It's wired via `SHADOW_DATABASE_URL` in `.env` → `datasource.shadowDatabaseUrl` in `prisma.config.ts`. It **must be a separate, empty, local DB — never one with real data** (Prisma wipes it on every run). Start it with:
   ```bash
   docker run -d --name apptracker-shadow-db -e POSTGRES_USER=postgres -e POSTGRES_PASSWORD=shadow -e POSTGRES_DB=prisma_shadow -p 127.0.0.1:5434:5432 postgres:16-alpine

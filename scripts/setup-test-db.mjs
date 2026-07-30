@@ -133,9 +133,29 @@ async function main() {
   );
   console.log(`• Wrote ${ENV_FILE}`);
 
-  // Apply the schema to the fresh database.
-  console.log("• Applying Prisma schema (db push)…");
-  execSync("npx prisma db push --accept-data-loss", {
+  // Replay the migration files rather than `db push`-ing the schema.
+  //
+  // `db push` derives DDL from schema.prisma, which cannot express everything
+  // the real database has — RateLimitEvent's "exactly one subject" CHECK lives
+  // in raw SQL in a migration. Pushing the schema would silently omit it, so
+  // tests would run against a laxer database than production and could never
+  // catch a violation. Replaying migrations gives the test DB identical DDL.
+  //
+  // The container may already hold tables from a previous run, with no
+  // migration history for `deploy` to reconcile against, so wipe the schema
+  // first. Done with plain SQL inside the container rather than
+  // `prisma migrate reset` — that command refuses to run unattended, and this
+  // is unambiguously scoped to the throwaway container created above (the
+  // statement is executed via `docker exec` on ${CONTAINER}, so it cannot
+  // reach any other database however DATABASE_URL is set).
+  console.log("• Dropping existing test schema…");
+  sh(
+    `docker exec ${CONTAINER} psql -U ${DB_USER} -d ${DB_NAME} ` +
+      `-c "DROP SCHEMA IF EXISTS public CASCADE; CREATE SCHEMA public;"`
+  );
+
+  console.log("• Applying migrations (migrate deploy)…");
+  execSync("npx prisma migrate deploy", {
     stdio: "inherit",
     env: { ...process.env, DATABASE_URL: databaseUrl },
   });

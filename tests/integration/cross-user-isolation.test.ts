@@ -227,6 +227,9 @@ describe("suggestions: attacker cannot touch the owner's rows", () => {
     const result = await generateEmailDraft(sug.id);
     expect(result).toMatchObject({ error: "Suggestion not found" });
     expect(openaiCreateMock).not.toHaveBeenCalled();
+    // A rejected request must cost nothing: otherwise guessing ids would drain
+    // a victim's quota — and the shared per-IP budget with it.
+    expect(await prisma.rateLimitEvent.count()).toBe(0);
   });
 
   it("sendEmailReply refuses another user's suggestion and never calls Gmail", async () => {
@@ -236,6 +239,7 @@ describe("suggestions: attacker cannot touch the owner's rows", () => {
     const result = await sendEmailReply(sug.id, "I'd love to interview!");
     expect(result).toMatchObject({ error: "Suggestion not found" });
     expect(gmailSendMock).not.toHaveBeenCalled();
+    expect(await prisma.rateLimitEvent.count()).toBe(0);
   });
 });
 

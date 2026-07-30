@@ -8,8 +8,10 @@ import {
   effectiveScanFrequency,
   isProScanFrequency,
 } from "@/lib/preferences";
-import { isPro as computeIsPro } from "@/lib/entitlements";
-import { PRO_REQUIRED_MESSAGE } from "@/lib/pro";
+// `isPro` is the pure rule, used below to *read* entitlement when shaping the
+// response; `requirePro` is the gate. Both come from the same module so the two
+// can never drift apart.
+import { isPro as computeIsPro, requirePro } from "@/lib/entitlements";
 
 /**
  * Appearance and scanning preferences.
@@ -80,14 +82,8 @@ export async function updatePreferences(input: unknown) {
   // the entitlement read when the patch actually asks for a gated value —
   // a theme switch shouldn't cost a second query.
   if (parsed.data.scanFrequency && isProScanFrequency(parsed.data.scanFrequency)) {
-    const user = await prisma.user.findUnique({
-      where: { id: userId },
-      select: { email: true, plan: true, proUntil: true },
-    });
-    if (!user) throw new Error("Unauthorized");
-    if (!computeIsPro(user)) {
-      return { error: PRO_REQUIRED_MESSAGE, proRequired: true as const };
-    }
+    const gate = await requirePro(userId);
+    if (gate) return gate;
   }
 
   await prisma.user.update({ where: { id: userId }, data: parsed.data });

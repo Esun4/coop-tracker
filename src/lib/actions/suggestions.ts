@@ -343,11 +343,6 @@ export async function generateEmailDraft(suggestionId: string) {
   const gate = await requirePro(userId);
   if (gate) return gate;
 
-  // Ahead of the model call for the same reason as the Pro gate: a blocked
-  // caller must not reach OpenAI.
-  const limited = await enforceRateLimit("email_draft", userId);
-  if (limited) return limited;
-
   const suggestion = await prisma.emailSuggestion.findFirst({
     where: { id: suggestionId, userId },
   });
@@ -357,6 +352,13 @@ export async function generateEmailDraft(suggestionId: string) {
     where: { id: userId },
     select: { name: true },
   });
+
+  // Quota is spent last, immediately before the paid call — never on a request
+  // that was going to fail anyway. A bogus or someone else's suggestion id must
+  // not be able to drain a user's budget (or their shared network's) without
+  // ever reaching OpenAI.
+  const limited = await enforceRateLimit("email_draft", userId);
+  if (limited) return limited;
 
   const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 
@@ -403,9 +405,6 @@ export async function sendEmailReply(suggestionId: string, body: string) {
   const gate = await requirePro(userId);
   if (gate) return gate;
 
-  const limited = await enforceRateLimit("email_send", userId);
-  if (limited) return limited;
-
   const suggestion = await prisma.emailSuggestion.findFirst({
     where: { id: suggestionId, userId },
   });
@@ -432,6 +431,11 @@ export async function sendEmailReply(suggestionId: string, body: string) {
       error: "Gmail credentials need to be refreshed. Please sign out and sign in with Google again to restore access and unlock email replies.",
     };
   }
+
+  // Last thing before Gmail, after every cheap check that could reject this
+  // send — a missing thread id or an undecryptable token must not cost a slot.
+  const limited = await enforceRateLimit("email_send", userId);
+  if (limited) return limited;
 
   const oauth2Client = new google.auth.OAuth2(
     process.env.GOOGLE_CLIENT_ID,

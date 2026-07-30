@@ -221,11 +221,16 @@ model ActivityLog {
 //
 // A row is keyed by EXACTLY ONE subject: a signed-in user (`userId`) or a
 // caller's network address (`ipHash`). Both are nullable so the two budgets can
-// share one table and one query path; the "exactly one" rule is enforced in
-// `src/lib/rate-limit.ts`, not by the DB, since Prisma can't express a check
-// constraint. Keeping `userId` a real FK (rather than collapsing both into a
-// generic subject string) means deleting a user still cascades their events
-// away instead of leaving orphans.
+// share one table and one query path. Keeping `userId` a real FK (rather than
+// collapsing both into a generic subject string) means deleting a user still
+// cascades their events away instead of leaving orphans.
+//
+// The "exactly one subject" rule is enforced in three places, deliberately:
+// the `Subject` union in `src/lib/rate-limit.ts` (compile time), and the
+// `RateLimitEvent_subject_check` CHECK constraint added in the
+// `rate_limit_one_subject` migration (run time, for any write path that
+// bypasses `consume()` — a seed, a script, a future migration). Prisma can't
+// declare a CHECK in this file, so it lives in raw SQL in that migration.
 //
 // `ipHash` is an HMAC, never a raw address — see `src/lib/client-ip.ts`.
 model RateLimitEvent {
