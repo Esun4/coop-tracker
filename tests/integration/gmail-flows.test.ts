@@ -158,6 +158,81 @@ describe("syncGmailEmails — classification & persistence", () => {
     expect(openaiCreateMock).not.toHaveBeenCalled();
   });
 
+  it("skips emails from the previous sync window, even ones judged irrelevant", async () => {
+    const user = await createTestUser({ googleAccessToken: encrypt(PLAINTEXT_ACCESS) });
+    actAs(user.id);
+    getMock.mockImplementation(({ id }: { id: string }) =>
+      gmailMessage(id, `Newsletter ${id}`, "news@medium.com", "Top stories this week.")
+    );
+    openaiCreateMock.mockResolvedValue({
+      choices: [{ message: { content: JSON.stringify({ action: "IRRELEVANT", status: null, company: null, role: null, confidence: 0.1, reasoning: "newsletter" }) } }],
+    });
+
+    // First sync: three irrelevant emails, none become suggestions.
+    listMock.mockResolvedValue({ data: { messages: [{ id: "m3" }, { id: "m2" }, { id: "m1" }] } });
+    await syncGmailEmails();
+    expect(openaiCreateMock).toHaveBeenCalledTimes(3);
+    let saved = await prisma.user.findUniqueOrThrow({ where: { id: user.id } });
+    expect(saved.recentEmailIds).toEqual(["m3", "m2", "m1"]);
+
+    // Second sync, past the cooldown: one new email arrived, m1 fell out of the window.
+    await prisma.user.update({ where: { id: user.id }, data: { lastEmailSync: null } });
+    openaiCreateMock.mockClear();
+    listMock.mockResolvedValue({ data: { messages: [{ id: "m4" }, { id: "m3" }, { id: "m2" }] } });
+    await syncGmailEmails();
+
+    expect(openaiCreateMock).toHaveBeenCalledTimes(1); // only m4 is classified
+    saved = await prisma.user.findUniqueOrThrow({ where: { id: user.id } });
+    expect(saved.recentEmailIds).toEqual(["m4", "m3", "m2"]);
+  });
+
+  it("leaves emails whose classification failed out of the window so they are retried", async () => {
+    const user = await createTestUser({ googleAccessToken: encrypt(PLAINTEXT_ACCESS) });
+    actAs(user.id);
+    listMock.mockResolvedValue({ data: { messages: [{ id: "ok" }, { id: "flaky" }] } });
+    getMock.mockImplementation(({ id }: { id: string }) =>
+      gmailMessage(id, `Subject ${id}`, "x@y.com", `body ${id}`)
+    );
+    openaiCreateMock.mockImplementation(({ messages }: { messages: { content: string }[] }) => {
+      if (messages[1].content.includes("flaky")) throw new Error("OpenAI 500");
+      return { choices: [{ message: { content: JSON.stringify({ action: "IRRELEVANT", status: null, company: null, role: null, confidence: 0.1, reasoning: "n/a" }) } }] };
+    });
+
+    await syncGmailEmails();
+    let saved = await prisma.user.findUniqueOrThrow({ where: { id: user.id } });
+    expect(saved.recentEmailIds).toEqual(["ok"]);
+
+    // Next sync retries only the failed one.
+    await prisma.user.update({ where: { id: user.id }, data: { lastEmailSync: null } });
+    openaiCreateMock.mockClear();
+    openaiCreateMock.mockResolvedValue({
+      choices: [{ message: { content: JSON.stringify({ action: "IRRELEVANT", status: null, company: null, role: null, confidence: 0.1, reasoning: "n/a" }) } }],
+    });
+    await syncGmailEmails();
+
+    expect(openaiCreateMock).toHaveBeenCalledTimes(1);
+    expect(openaiCreateMock.mock.calls[0][0].messages[1].content).toContain("flaky");
+    saved = await prisma.user.findUniqueOrThrow({ where: { id: user.id } });
+    expect(saved.recentEmailIds).toEqual(["ok", "flaky"]);
+  });
+
+  it("treats a reply with no valid action as a failure and retries it next sync", async () => {
+    const user = await createTestUser({ googleAccessToken: encrypt(PLAINTEXT_ACCESS) });
+    actAs(user.id);
+    listMock.mockResolvedValue({ data: { messages: [{ id: "m1" }] } });
+    getMock.mockResolvedValue(gmailMessage("m1", "Subject", "x@y.com", "body"));
+    openaiCreateMock.mockResolvedValue({ choices: [{ message: { content: "{}" } }] });
+
+    await syncGmailEmails();
+    const saved = await prisma.user.findUniqueOrThrow({ where: { id: user.id } });
+    expect(saved.recentEmailIds).toEqual([]);
+
+    await prisma.user.update({ where: { id: user.id }, data: { lastEmailSync: null } });
+    openaiCreateMock.mockClear();
+    await syncGmailEmails();
+    expect(openaiCreateMock).toHaveBeenCalledTimes(1); // still eligible, classified again
+  });
+
   it("enforces the 5-minute cooldown between syncs", async () => {
     const user = await createTestUser({
       googleAccessToken: encrypt(PLAINTEXT_ACCESS),

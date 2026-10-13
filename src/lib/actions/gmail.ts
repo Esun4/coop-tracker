@@ -48,6 +48,12 @@ For the company field: extract the employer/hiring company, NOT the job board or
 
 const MIN_CONFIDENCE = 0.45;
 
+// How many of the newest emails each sync looks at. The IDs from this window are
+// saved on the user so the next sync can skip them.
+const SYNC_WINDOW = 50;
+
+const CLASSIFIER_ACTIONS = ["NEW_APPLICATION", "STATUS_UPDATE", "IRRELEVANT"];
+
 export async function syncGmailEmails() {
   const userId = await getAuthUserId();
 
@@ -55,7 +61,7 @@ export async function syncGmailEmails() {
 
   const user = await prisma.user.findUnique({
     where: { id: userId },
-    select: { googleAccessToken: true, googleRefreshToken: true, lastEmailSync: true },
+    select: { googleAccessToken: true, googleRefreshToken: true, lastEmailSync: true, recentEmailIds: true },
   });
 
   if (user?.lastEmailSync) {
@@ -118,7 +124,7 @@ export async function syncGmailEmails() {
   try {
     listResponse = await gmail.users.messages.list({
       userId: "me",
-      maxResults: 50,
+      maxResults: SYNC_WINDOW,
     });
   } catch (err: unknown) {
     const status = (err as { status?: number })?.status;
@@ -133,7 +139,7 @@ export async function syncGmailEmails() {
 
   const messages = listResponse.data.messages ?? [];
   if (messages.length === 0) {
-    await prisma.user.update({ where: { id: userId }, data: { lastEmailSync: new Date() } });
+    await prisma.user.update({ where: { id: userId }, data: { lastEmailSync: new Date(), recentEmailIds: [] } });
     return { success: true, newSuggestions: 0, scanned: 0 };
   }
 
@@ -143,12 +149,18 @@ export async function syncGmailEmails() {
     where: { userId, emailMessageId: { in: messageIds } },
     select: { emailMessageId: true },
   });
-  const existingIdSet = new Set(existingIds.map((e) => e.emailMessageId));
+  // Already classified = in the last sync window (this is what catches emails
+  // judged irrelevant or low-confidence, which never become a suggestion) or
+  // already turned into a suggestion.
+  const seenIds = new Set([
+    ...user.recentEmailIds,
+    ...existingIds.map((e) => e.emailMessageId),
+  ]);
 
-  const newMessages = messages.filter((m) => m.id && !existingIdSet.has(m.id));
+  const newMessages = messages.filter((m) => m.id && !seenIds.has(m.id));
 
   if (newMessages.length === 0) {
-    await prisma.user.update({ where: { id: userId }, data: { lastEmailSync: new Date() } });
+    await prisma.user.update({ where: { id: userId }, data: { lastEmailSync: new Date(), recentEmailIds: messageIds } });
     // These messages were examined, just already known — saying "0 scanned"
     // would read as though the scan never ran.
     return { success: true, newSuggestions: 0, scanned: messageIds.length };
@@ -165,6 +177,10 @@ export async function syncGmailEmails() {
 
   // Classify emails in parallel, max 5 concurrent OpenAI calls
   const limit = pLimit(5);
+
+  // Emails whose classification call failed are left out of the saved window,
+  // so the next sync retries them instead of skipping them forever.
+  const failedIds = new Set<string>();
 
   type ClassificationResult = {
     message: gmail_v1.Schema$Message;
@@ -207,8 +223,15 @@ export async function syncGmailEmails() {
             ],
           });
           const classification = JSON.parse(completion.choices[0].message.content ?? "{}");
+          // A reply without a known action is a failed classification, not an
+          // "irrelevant" verdict — keep it retryable.
+          if (!CLASSIFIER_ACTIONS.includes(classification.action)) {
+            failedIds.add(message.id);
+            return null;
+          }
           return { message, subject, from, snippet, emailDate, classification };
         } catch {
+          failedIds.add(message.id);
           return null;
         }
       })
@@ -250,7 +273,13 @@ export async function syncGmailEmails() {
     newSuggestions++;
   }
 
-  await prisma.user.update({ where: { id: userId }, data: { lastEmailSync: new Date() } });
+  await prisma.user.update({
+    where: { id: userId },
+    data: {
+      lastEmailSync: new Date(),
+      recentEmailIds: messageIds.filter((id) => !failedIds.has(id)),
+    },
+  });
 
   revalidatePath("/dashboard");
   return { success: true, newSuggestions, scanned: messageIds.length };

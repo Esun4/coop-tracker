@@ -20,6 +20,11 @@ model User {
   googleRefreshToken String?
   lastEmailSync      DateTime?
 
+  // Gmail message IDs from the latest sync window (newest first, at most 50).
+  // The next sync skips these, so emails already judged irrelevant or
+  // low-confidence (which never become an EmailSuggestion) aren't re-classified.
+  recentEmailIds     String[]  @default([])
+
   // Which reminders are on, and how long before. Kept as JSON rather than a
   // second table: it is a per-kind settings blob, never queried across users.
   reminderSettings Json?
